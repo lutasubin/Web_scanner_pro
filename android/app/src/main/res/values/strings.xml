@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">Web Scanner Pro</string>
+    <string name="close">Đóng</string>
+    <string name="reload">Tải lại</string>
+    <string name="web_session_status">%1$s · Đang mở WhatsApp Web</string>
+    <string name="loading_whatsapp">Đang tải WhatsApp Web</string>
+    <string name="web_ready_hint">WhatsApp Web · Dùng WhatsApp chính → Thiết bị liên kết để quét QR</string>
+    <string name="web_slow_hint">Trang phản hồi chậm. Nếu chưa thấy QR, hãy chọn Tải lại.</string>
+</resources>

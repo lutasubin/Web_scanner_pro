@@ -1,0 +1,3 @@
+<resources>
+    <dimen name="web_progress_height">4dp</dimen>
+</resources>

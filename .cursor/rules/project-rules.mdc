@@ -1,0 +1,143 @@
+---
+description: Quy tắc Web Scanner Pro - Flutter Android + native Kotlin
+alwaysApply: true
+---
+# Web Scanner Pro - Project Rules
+
+## Tổng quan dự án
+- **Tên dự án**: Web Scanner Pro
+- **Framework**: Flutter (Dart SDK ^3.11.5)
+- **Platform**: Chỉ hỗ trợ Android (không cần iOS)
+- **Kiến trúc**: Feature-based architecture với GetX state management
+- **Dependency Injection**: GetIt (get_it: ^9.2.0)
+- **State Management**: GetX (get: ^4.7.3)
+- **Native Code**: Có thể viết native Android code (Kotlin/Java) khi cần
+
+## Cấu trúc thư mục
+
+```
+lib/
+├── core/                    # Core functionality
+│   ├── constants/          # App constants, strings, colors
+│   ├── di/                 # Dependency injection setup
+│   ├── router/             # App routing và navigation (GetX routes)
+│   └── untils/             # Utility functions và helpers
+├── features/               # Feature modules
+│   └── [feature_name]/    # Mỗi feature có cấu trúc:
+│       ├── model/         # Data models (optional - chỉ tạo khi cần)
+│       ├── repositories/  # Data repositories
+│       ├── service/       # Business logic services
+│       ├── viewmodels/    # GetX controllers/viewmodels
+│       └── views/         # UI screens/widgets
+│           └── widgets/  # Reusable widgets cho feature này
+└── main.dart              # Entry point
+```
+
+## Quy tắc phát triển
+
+### 1. Kiến trúc Feature-based
+- Mỗi feature là một module độc lập với đầy đủ: model, repository, service, viewmodel, views
+- Features không phụ thuộc trực tiếp vào nhau
+- Giao tiếp giữa features thông qua core hoặc events
+
+### 2. State Management với GetX
+- Sử dụng GetXController cho state management
+- Đặt controllers trong thư mục `viewmodels/`
+- Sử dụng GetX reactive programming (`.obs`, `Obx`, `GetBuilder`)
+- **Get.put() vs Get.lazyPut() - Quy tắc tối ưu**:
+  - **Get.put()**: Khởi tạo ngay lập tức — chỉ dùng khi controller cần ngay và chỉ dùng 1 lần
+  - **Get.lazyPut()**: Khởi tạo khi được sử dụng lần đầu (KHUYẾN KHÍCH) — dùng trong Bindings
+  - **Get.find()**: Lấy instance đã đăng ký — dùng trong views
+  - **Best Practice**:
+    - ✅ Tạo Bindings class cho mỗi route, dùng `Get.lazyPut()` trong dependencies()
+    - ✅ Trong views, dùng `Get.find<Controller>()` thay vì `Get.put()`
+    - ✅ Dùng `Get.put()` chỉ khi thực sự cần khởi tạo ngay (ít dùng)
+
+### 3. Dependency Injection
+- Sử dụng GetIt cho dependency injection
+- Setup DI trong `lib/core/di/`
+- Đăng ký tất cả dependencies trong một file setup
+
+### 4. Naming Conventions
+- **Files**: snake_case (ví dụ: `session_service.dart`)
+- **Classes**: PascalCase (ví dụ: `SessionService`)
+- **Variables/Functions**: camelCase (ví dụ: `exerciseCount`, `startWorkout()`)
+- **Constants**: UPPER_SNAKE_CASE (ví dụ: `MAX_HISTORY_ITEMS`)
+
+### 5. Code Organization
+- Mỗi file chỉ chứa một class chính
+- Tách logic business ra service layer
+- UI chỉ xử lý presentation logic
+- Data access logic trong repository layer
+- Tách widgets phức tạp thành widget con trong `views/widgets/`
+
+### 6. Assets
+- Sử dụng `flutter_svg` cho SVG icons
+- Đặt assets trong thư mục `assets/` (icon, ảnh minh họa, animation)
+- Khai báo assets trong `pubspec.yaml`
+
+### 7. Responsive Design với MediaQuery
+- Luôn sử dụng `MediaQuery.of(context)` để lấy `size`, `padding`, `viewInsets`
+- Không hardcode kích thước, tính toán dựa trên màn hình thực tế
+- Dùng `MediaQuery` trong widget tests để mock kích thước màn hình
+- Tạo helper functions trong `lib/core/untils/` nếu cần
+
+## Dependencies mục tiêu
+- `get: ^4.7.3` - State management và routing
+- `get_it: ^9.2.0` - Dependency injection
+- `flutter_svg: ^2.2.3` - SVG support
+- `cupertino_icons: ^1.0.8` - Icons
+- Thêm thư viện mới: đọc kỹ doc trên pub.dev trước khi dùng
+
+## Mục đích ứng dụng
+Ứng dụng tiện ích WhatsApp Web: phiên liên kết, lưu trạng thái, lịch sử thông báo local, chat nhanh và tệp. Đặc tả tại docs/02_PRODUCT_SPEC.md; trạng thái thực tế tại docs/05_DELIVERY.md.
+
+## Quy tắc khi code
+1. Tuân thủ cấu trúc thư mục theo feature và layer
+2. Sử dụng GetX cho state management và navigation
+3. Inject dependencies qua GetIt, không tạo instance trực tiếp
+4. Tách biệt rõ UI, Business Logic, Data layers
+5. Xử lý errors một cách rõ ràng
+6. Comment bằng tiếng Việt cho logic phức tạp
+7. Khai báo types rõ ràng, tránh `dynamic` khi có thể
+8. Mỗi file không vượt quá 100 dòng — tách file nếu cần
+9. Mỗi hàm/method chỉ làm duy nhất 1 nhiệm vụ
+10. Luôn trả lời và giải thích bằng tiếng Việt
+11. Luôn dùng MediaQuery để tránh tràn viền và dễ test
+
+## Khi thêm feature mới
+1. Tạo thư mục `lib/features/[feature_name]/`
+2. Tạo các thư mục con: model, repositories, service, viewmodels, views
+3. Đăng ký dependencies trong `lib/core/di/`
+4. Thêm routes vào `lib/core/router/` nếu cần navigation
+5. Thêm constants trong `lib/core/constants/` nếu cần
+
+## Router (Navigation)
+- Router quản lý trong `lib/core/router/`
+- Dùng GetX routing (`GetMaterialApp`, `GetPage`, `Get.to()`, ...)
+- Route names định nghĩa trong constants
+- Tạo Bindings class cho mỗi route, dùng `Get.lazyPut()` trong Bindings
+
+## Lưu ý đặc biệt (Web Scanner)
+- Chỉ Android; base minSdk 29. Native Kotlin trong `android/app/src/main/kotlin/`.
+- WhatsApp Web không phải API do app sở hữu; cần test trên tài khoản được phép trước khi hứa đồng bộ.
+- Hai slot cần WebView profile độc lập; không chia sẻ cookie âm thầm.
+- Lịch sử thông báo chỉ ghi sau opt-in + Notification Access; không quảng cáo phục hồi lịch sử đã xóa.
+- SAF và MediaStore cho status/tệp; không xin MANAGE_EXTERNAL_STORAGE hoặc Accessibility.
+- Không log chat, số điện thoại, cookie; không thêm ads/analytics/backend vào base.
+- Test case có ý nghĩa cho service, bridge, widget và layout. Kết quả thật ghi trong docs/05_DELIVERY.md.
+- Khi source code khác memory: kiểm tra code trước, sửa memory thay vì xem dữ liệu copy là tính năng đã xong.
+
+## AI Workflow (Memory & Prompts)
+
+- **Memory** (`.cursor/memory/`): đọc `current_focus.md` trước khi code; kiểm tra `feature_status.md` và `known_bugs.md` để tránh làm trùng / sửa nhầm
+- **Prompts** (`.cursor/prompts/`): dùng template khi build màn, refactor, debug, thêm feature
+- **Docs** (`docs/`): nghiên cứu, product spec, architecture và plan — đọc trước khi triển khai
+- Cập nhật memory khi đổi ưu tiên sprint, hoàn thành feature, hoặc phát hiện bug mới
+
+## Bắt buộc áp dụng Flutter Skills
+- Luôn coi toàn bộ skill trong `.cursor/skills` là chuẩn mặc định khi làm việc
+- Trước khi bắt đầu task mới, ưu tiên đọc skill liên quan trong `.cursor/skills`
+- Task đa mảng (UI, state, routing, data, test): kết hợp nhiều skill tương ứng
+- Xung đột giữa cách làm hiện tại và skill: ưu tiên skill nếu không trái yêu cầu business
+- Khi trả lời kế hoạch/giải pháp: thể hiện rõ tư duy senior từ skill (kiến trúc, chất lượng code, test, hiệu năng, UX)
