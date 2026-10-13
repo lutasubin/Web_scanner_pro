@@ -53,7 +53,7 @@ class WebSessionActivity : ComponentActivity() {
             SessionProfiles.register(this)
             onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
                 override fun handleOnBackPressed() {
-                    if (view.canGoBack()) view.goBack() else finish()
+                    handleWebBack(view)
                 }
             })
             view.loadUrl("https://web.whatsapp.com/")
@@ -73,7 +73,7 @@ class WebSessionActivity : ComponentActivity() {
         val sessions = WebSessionStore(this).list()
         root.addView(WebSessionToolbar(
             this, sessions, sessionId,
-            onClose = ::finish,
+            onClose = { handleWebBack(view) },
             onSelect = ::switchSession,
             onAdd = ::showCreateAccount,
             onReload = { view.reload() },
@@ -113,29 +113,17 @@ class WebSessionActivity : ComponentActivity() {
         view.overScrollMode = View.OVER_SCROLL_NEVER
     }
 
-    private fun fitDesktopPage(view: WebView) {
+    private fun installMobileLayout(view: WebView) {
         val widthDp = view.width / resources.displayMetrics.density
-        val scale = (widthDp / 500f).coerceIn(0.65f, 1f)
-        val expandedWidth = 96f / scale
-        val script = "(function(){" +
-            "var style=document.getElementById('web-scanner-fixed-width');" +
-            "if(!style){style=document.createElement('style');" +
-            "style.id='web-scanner-fixed-width';document.head.appendChild(style);}" +
-            "style.textContent='html,body,*{overscroll-behavior-x:none!important;}" +
-            "html,body{overflow-x:hidden!important;}" +
-            "*::-webkit-scrollbar:horizontal{height:0!important;display:none!important;}';" +
-            "document.documentElement.style.zoom='$scale';" +
-            "document.documentElement.style.width='${expandedWidth}%';" +
-            "document.documentElement.style.overflowX='hidden';" +
-            "document.body.style.overflowX='hidden';" +
-            "if(!window.__webScannerWidthLock){window.__webScannerWidthLock=true;" +
-            "var sx=0,sy=0;document.addEventListener('touchstart',function(e){" +
-            "if(e.touches.length){sx=e.touches[0].clientX;sy=e.touches[0].clientY;}},{passive:true});" +
-            "document.addEventListener('touchmove',function(e){if(!e.touches.length)return;" +
-            "var dx=Math.abs(e.touches[0].clientX-sx),dy=Math.abs(e.touches[0].clientY-sy);" +
-            "if(dx>dy)e.preventDefault();},{passive:false});}" +
-            "return true;})()"
-        view.evaluateJavascript(script, null)
+        val scale = (widthDp / 420f).coerceIn(0.78f, 1f)
+        val expandedWidth = 100f / scale
+        view.evaluateJavascript(WebMobileLayout.install(scale, expandedWidth), null)
+    }
+
+    private fun handleWebBack(view: WebView) {
+        view.evaluateJavascript(WebMobileLayout.BACK_SCRIPT) { handled ->
+            if (handled != "true") finish()
+        }
     }
 
     private fun showMessage(text: String) {
@@ -187,7 +175,7 @@ class WebSessionActivity : ComponentActivity() {
         view.evaluateJavascript(script) { result ->
             if (result == "\"submitted\"") {
                 phoneOverlay.visibility = View.GONE
-                fitDesktopPage(view)
+                installMobileLayout(view)
             } else {
                 Toast.makeText(this, "Chưa gửi được số điện thoại. Vui lòng thử lại.", Toast.LENGTH_SHORT).show()
             }
@@ -269,7 +257,7 @@ class WebSessionActivity : ComponentActivity() {
             "return 'loading';})()"
         view.evaluateJavascript(script) { state ->
             if (state == "\"chat\"") {
-                fitDesktopPage(view)
+                installMobileLayout(view)
                 qrOverlay.visibility = View.GONE
                 phoneOverlay.visibility = View.GONE
                 progress.visibility = View.GONE
