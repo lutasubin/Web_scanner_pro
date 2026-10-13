@@ -7,6 +7,8 @@ import '../../features/files/files_controller.dart';
 import '../../features/history/history_page.dart';
 import '../../features/history/history_controller.dart';
 import '../../features/home/home_page.dart';
+import '../../features/home/home_controller.dart';
+import '../../features/help/how_to_use_page.dart';
 import '../../features/sessions/sessions_page.dart';
 import '../../features/sessions/sessions_controller.dart';
 import '../../features/settings/settings_page.dart';
@@ -21,7 +23,13 @@ import 'app_routes.dart';
 class AppPages {
   AppPages._();
   static final routes = <GetPage<void>>[
-    GetPage(name: AppRoutes.home, page: HomePage.new),
+    GetPage(
+      name: AppRoutes.home,
+      page: HomePage.new,
+      binding: BindingsBuilder(
+        () => Get.lazyPut(() => HomeController(services<AppPlatform>())),
+      ),
+    ),
     GetPage(
       name: AppRoutes.sessions,
       page: SessionsPage.new,
@@ -73,5 +81,6 @@ class AppPages {
       ),
     ),
     GetPage(name: AppRoutes.settings, page: SettingsPage.new),
+    GetPage(name: AppRoutes.howToUse, page: HowToUsePage.new),
   ];
 }

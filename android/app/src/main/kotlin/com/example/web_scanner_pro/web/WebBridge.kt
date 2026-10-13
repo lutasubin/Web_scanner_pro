@@ -11,11 +11,19 @@ class WebBridge(private val activity: Activity) {
 
     fun handle(call: MethodCall, result: MethodChannel.Result): Boolean {
         if (call.method == "listSessions") {
-            result.success(store.list().map(StoredWebSession::toMap))
+            val activeId = store.activeId()
+            result.success(store.list().map { it.toMap(activeId) })
             return true
         }
         if (call.method == "createSession") {
             return create(call.argument<String>("name").orEmpty(), result)
+        }
+        if (call.method == "renameSession") {
+            return rename(
+                call.argument<String>("id").orEmpty(),
+                call.argument<String>("name").orEmpty(),
+                result,
+            )
         }
         if (call.method !in setOf("openSession", "resetSession", "deleteSession")) return false
         val id = call.argument<String>("id").orEmpty()
@@ -27,11 +35,17 @@ class WebBridge(private val activity: Activity) {
             result.error("profile_unavailable", "Cập nhật Android System WebView để dùng nhiều người dùng.", null)
             return true
         }
+        if (call.method == "deleteSession" && id == WebSessionStore.DEFAULT_ID &&
+            !supportsProfiles() && store.list().size > 1) {
+            result.error("profile_unavailable", "Cập nhật Android System WebView trước khi xóa tài khoản này.", null)
+            return true
+        }
         try {
             when (call.method) {
                 "resetSession" -> SessionProfiles.reset(id, result)
                 "deleteSession" -> delete(id, result)
                 else -> {
+                    store.select(id)
                     activity.startActivity(Intent(activity, WebSessionActivity::class.java).putExtra("id", id))
                     result.success(null)
                 }
@@ -43,7 +57,7 @@ class WebBridge(private val activity: Activity) {
     }
 
     private fun create(name: String, result: MethodChannel.Result): Boolean {
-        if (!supportsProfiles()) {
+        if (store.list().isNotEmpty() && !supportsProfiles()) {
             result.error("profile_unavailable", "Cập nhật Android System WebView để tạo thêm người dùng.", null)
             return true
         }
@@ -58,11 +72,21 @@ class WebBridge(private val activity: Activity) {
         return true
     }
 
-    private fun delete(id: String, result: MethodChannel.Result) {
-        if (id == WebSessionStore.DEFAULT_ID) {
-            result.error("default_session", "Không thể xóa người dùng mặc định.", null)
-            return
+    private fun rename(id: String, name: String, result: MethodChannel.Result): Boolean {
+        return try {
+            if (store.rename(id, name)) result.success(null)
+            else result.error("invalid_session", "Không tìm thấy tài khoản.", null)
+            true
+        } catch (_: IllegalArgumentException) {
+            result.error("invalid_name", "Tên tài khoản cần từ 1 đến 40 ký tự.", null)
+            true
+        } catch (_: Exception) {
+            result.error("rename_failed", "Chưa đổi được tên tài khoản. Hãy thử lại.", null)
+            true
         }
+    }
+
+    private fun delete(id: String, result: MethodChannel.Result) {
         SessionProfiles.reset(id, object : MethodChannel.Result {
             override fun success(value: Any?) {
                 if (store.remove(id)) result.success(null)

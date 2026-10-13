@@ -7,4 +7,5 @@ class AppRoutes {
   static const directChat = '/direct-chat';
   static const files = '/files';
   static const settings = '/settings';
+  static const howToUse = '/how-to-use';
 }

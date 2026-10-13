@@ -3,31 +3,37 @@ import 'package:flutter/material.dart';
 class AppTheme {
   AppTheme._();
 
-  static ThemeData get light => _build(Brightness.light);
-  static ThemeData get dark => _build(Brightness.dark);
-
-  static ThemeData _build(Brightness brightness) {
-    final dark = brightness == Brightness.dark;
+  static ThemeData get light {
     final scheme = ColorScheme.fromSeed(
-      seedColor: const Color(0xFF087F72),
-      brightness: brightness,
+      seedColor: const Color(0xFF08C567),
+      brightness: Brightness.light,
     );
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
-      scaffoldBackgroundColor: dark
-          ? const Color(0xFF101C1B)
-          : const Color(0xFFF4F8F7),
-      appBarTheme: const AppBarTheme(
+      brightness: Brightness.light,
+      scaffoldBackgroundColor: const Color(0xFFF7F7F7),
+      appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,
         scrolledUnderElevation: 0,
         centerTitle: false,
+        titleTextStyle: TextStyle(
+          color: scheme.onSurface,
+          fontSize: 16,
+          fontWeight: FontWeight.w700,
+        ),
       ),
       cardTheme: CardThemeData(
-        elevation: 0,
+        elevation: 1.5,
+        shadowColor: Colors.black.withValues(alpha: 0.10),
         margin: EdgeInsets.zero,
-        color: dark ? const Color(0xFF1B2A28) : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        color: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: Colors.white,
+        elevation: 4,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
@@ -43,11 +49,11 @@ class AppTheme {
           minimumSize: const Size(48, 52),
           padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(12),
           ),
         ),
       ),
-      textTheme: ThemeData(brightness: brightness).textTheme.apply(
+      textTheme: ThemeData(brightness: Brightness.light).textTheme.apply(
         bodyColor: scheme.onSurface,
         displayColor: scheme.onSurface,
       ),

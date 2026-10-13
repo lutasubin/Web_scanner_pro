@@ -7,13 +7,18 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   const channel = MethodChannel('sessions-test');
   final records = <Map<String, Object?>>[
-    {'id': 'personal', 'name': 'Cá nhân', 'isDefault': true},
+    {'id': 'personal', 'name': 'Cá nhân', 'isDefault': true, 'isActive': true},
   ];
 
   setUp(() {
     records
       ..clear()
-      ..add({'id': 'personal', 'name': 'Cá nhân', 'isDefault': true});
+      ..add({
+        'id': 'personal',
+        'name': 'Cá nhân',
+        'isDefault': true,
+        'isActive': true,
+      });
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
           switch (call.method) {
@@ -32,6 +37,13 @@ void main() {
             case 'deleteSession':
               final args = (call.arguments as Map).cast<String, Object?>();
               records.removeWhere((item) => item['id'] == args['id']);
+              return null;
+            case 'renameSession':
+              final args = (call.arguments as Map).cast<String, Object?>();
+              final index = records.indexWhere(
+                (item) => item['id'] == args['id'],
+              );
+              records[index] = {...records[index], 'name': args['name']};
               return null;
           }
           return null;
@@ -54,6 +66,9 @@ void main() {
       'Cá nhân',
       'Bán hàng',
     ]);
+
+    await controller.rename('user_sales', 'Hỗ trợ');
+    expect(controller.sessions.last.name, 'Hỗ trợ');
 
     await controller.delete('user_sales');
     expect(controller.sessions.single.id, 'personal');

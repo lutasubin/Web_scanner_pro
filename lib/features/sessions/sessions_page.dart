@@ -1,129 +1,136 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../core/constants/app_copy.dart';
-import '../../core/widgets/app_scaffold.dart';
+import '../../core/router/app_routes.dart';
 import '../../core/widgets/confirm_action.dart';
-import '../../core/widgets/info_card.dart';
 import '../../core/widgets/task_feedback.dart';
+import 'account_name_dialog.dart';
 import 'session_card.dart';
 import 'sessions_controller.dart';
 import 'web_session.dart';
 
 class SessionsPage extends StatefulWidget {
   const SessionsPage({super.key});
+
   @override
   State<SessionsPage> createState() => _SessionsPageState();
 }
 
-class _SessionsPageState extends State<SessionsPage> {
-  late final c = Get.find<SessionsController>();
+class _SessionsPageState extends State<SessionsPage>
+    with WidgetsBindingObserver {
+  late final SessionsController controller = Get.find<SessionsController>();
+
   @override
   void initState() {
     super.initState();
-    c.load();
-  }
-
-  Future<void> _create() async {
-    final name = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) {
-        final input = TextEditingController();
-        return AlertDialog(
-          title: const Text('Thêm người dùng'),
-          content: TextField(
-            controller: input,
-            autofocus: true,
-            maxLength: 40,
-            textCapitalization: TextCapitalization.words,
-            decoration: const InputDecoration(
-              labelText: 'Tên người dùng',
-              hintText: 'Ví dụ: Bán hàng',
-            ),
-            onSubmitted: (value) {
-              if (value.trim().isNotEmpty) Navigator.pop(dialogContext, value);
-            },
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Hủy'),
-            ),
-            FilledButton(
-              onPressed: () {
-                final value = input.text.trim();
-                if (value.isNotEmpty) Navigator.pop(dialogContext, value);
-              },
-              child: const Text('Tạo'),
-            ),
-          ],
-        );
-      },
-    );
-    if (name != null && name.trim().isNotEmpty) await c.create(name);
-  }
-
-  Future<void> _delete(WebSession session) async {
-    final ok = await confirmAction(
-      context,
-      title: 'Xóa ${session.name}?',
-      message: 'Người dùng và toàn bộ đăng nhập Web cục bộ sẽ bị xóa.',
-      confirmLabel: 'Xóa người dùng',
-    );
-    if (ok) await c.delete(session.id);
-  }
-
-  Future<void> _reset(String id) async {
-    final ok = await confirmAction(
-      context,
-      title: 'Đặt lại phiên?',
-      message:
-          'Thao tác này xóa đăng nhập và dữ liệu web cục bộ của riêng phiên.',
-      confirmLabel: 'Xóa phiên',
-    );
-    if (ok) await c.reset(id);
+    WidgetsBinding.instance.addObserver(this);
+    controller.load();
   }
 
   @override
-  Widget build(BuildContext context) => AppScaffold(
-    title: AppCopy.sessions,
-    onResume: c.load,
-    actions: [
-      Obx(
-        () => IconButton(
-          tooltip: c.multiProfile.value
-              ? 'Thêm người dùng'
-              : 'Thiết bị chưa hỗ trợ nhiều Web profile',
-          onPressed: c.multiProfile.value && !c.busy.value ? _create : null,
-          icon: const Icon(Icons.person_add_alt_1_rounded),
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) controller.load();
+  }
+
+  Future<String?> _askForName({String? initialValue}) async {
+    return showDialog<String>(
+      context: context,
+      builder: (_) => AccountNameDialog(initialValue: initialValue),
+    );
+  }
+
+  Future<void> _create() async {
+    final name = await _askForName();
+    if (name != null) await controller.create(name);
+  }
+
+  Future<void> _rename(WebSession session) async {
+    final name = await _askForName(initialValue: session.name);
+    if (name != null && name != session.name) {
+      await controller.rename(session.id, name);
+    }
+  }
+
+  Future<void> _delete(WebSession session) async {
+    final approved = await confirmAction(
+      context,
+      title: 'Delete ${session.name}?',
+      message:
+          'This removes the account and its local WhatsApp Web sign-in data from this device.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+    );
+    if (approved) await controller.delete(session.id);
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: const Text('Account Management'),
+      actions: [
+        IconButton(
+          tooltip: 'How To Use',
+          onPressed: () => Get.toNamed<void>(AppRoutes.howToUse),
+          icon: const Icon(Icons.help_outline_rounded),
+        ),
+      ],
+    ),
+    body: SafeArea(
+      top: false,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: Obx(
+            () => ListView(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+              children: [
+                if (controller.busy.value ||
+                    controller.error.value.isNotEmpty ||
+                    controller.notice.value.isNotEmpty)
+                  TaskFeedback(
+                    controller: controller,
+                    onRetry: controller.load,
+                  ),
+                ...controller.sessions.map((session) {
+                  final supported =
+                      session.isDefault || controller.multiProfile.value;
+                  final canDelete =
+                      controller.multiProfile.value ||
+                      !session.isDefault ||
+                      controller.sessions.length == 1;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: SessionCard(
+                      title: session.name,
+                      enabled: supported && !controller.busy.value,
+                      onOpen: () => controller.open(session.id),
+                      onRename: () => _rename(session),
+                      onDelete: canDelete ? () => _delete(session) : null,
+                    ),
+                  );
+                }),
+                AddAccountCard(
+                  enabled: controller.canCreate && !controller.busy.value,
+                  onTap: _create,
+                ),
+                if (!controller.canCreate) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    'Update Android System WebView to add another account.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ],
+            ),
+          ),
         ),
       ),
-    ],
-    children: [
-      const InfoCard(text: AppCopy.webNote),
-      TaskFeedback(controller: c),
-      Obx(
-        () => ListView.separated(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: c.sessions.length,
-          separatorBuilder: (_, _) => const SizedBox(height: 12),
-          itemBuilder: (context, index) {
-            final session = c.sessions[index];
-            final supported = session.isDefault || c.multiProfile.value;
-            return SessionCard(
-              title: session.name,
-              description: supported
-                  ? 'Dữ liệu đăng nhập và cookie được lưu riêng cho người dùng này.'
-                  : 'Cập nhật Android System WebView để sử dụng nhiều người dùng.',
-              enabled: supported && !c.busy.value,
-              onOpen: () => c.open(session.id),
-              onReset: () => _reset(session.id),
-              onDelete: session.isDefault ? null : () => _delete(session),
-            );
-          },
-        ),
-      ),
-    ],
+    ),
   );
 }

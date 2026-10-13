@@ -5,5 +5,10 @@ data class StoredWebSession(
     val name: String,
     val isDefault: Boolean = false,
 ) {
-    fun toMap() = mapOf("id" to id, "name" to name, "isDefault" to isDefault)
+    fun toMap(activeId: String?) = mapOf(
+        "id" to id,
+        "name" to name,
+        "isDefault" to isDefault,
+        "isActive" to (id == activeId),
+    )
 }

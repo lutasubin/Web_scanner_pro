@@ -1,33 +1,16 @@
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_copy.dart';
-import '../../core/di/di.dart';
-import '../../core/repositories/preferences_repository.dart';
 import '../../core/widgets/app_scaffold.dart';
 import '../../core/widgets/info_card.dart';
 
 class SettingsPage extends StatelessWidget {
-  SettingsPage({super.key});
-  final repository = services<PreferencesRepository>();
+  const SettingsPage({super.key});
 
   @override
   Widget build(BuildContext context) => AppScaffold(
     title: AppCopy.settings,
     children: [
-      Text('Giao diện', style: Theme.of(context).textTheme.titleMedium),
-      const SizedBox(height: 10),
-      DropdownButtonFormField<String>(
-        initialValue: repository.value.value.theme,
-        items: const [
-          DropdownMenuItem(value: 'system', child: Text('Theo hệ thống')),
-          DropdownMenuItem(value: 'light', child: Text('Sáng')),
-          DropdownMenuItem(value: 'dark', child: Text('Tối')),
-        ],
-        onChanged: (value) {
-          if (value != null) repository.update({'theme': value});
-        },
-      ),
-      const SizedBox(height: 22),
       const InfoCard(
         icon: Icons.shield_outlined,
         text:

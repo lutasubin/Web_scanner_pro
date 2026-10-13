@@ -196,6 +196,7 @@ class WebSessionActivity : ComponentActivity() {
 
     private fun switchSession(id: String) {
         if (id == sessionId) return
+        WebSessionStore(this).select(id)
         startActivity(Intent(this, WebSessionActivity::class.java).putExtra("id", id))
         finish()
     }

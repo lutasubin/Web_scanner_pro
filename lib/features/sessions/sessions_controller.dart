@@ -22,6 +22,8 @@ class SessionsController extends TaskController {
     );
   }
 
+  bool get canCreate => sessions.isEmpty || multiProfile.value;
+
   Future<void> open(String id) =>
       perform(() => _platform.invoke<void>('openSession', {'id': id}));
 
@@ -33,10 +35,18 @@ class SessionsController extends TaskController {
   Future<void> create(String name) => perform(() async {
     await _platform.invoke<void>('createSession', {'name': name.trim()});
     await _loadSessions();
-  }, success: 'Đã tạo người dùng mới.');
+  }, success: 'Account added.');
+
+  Future<void> rename(String id, String name) => perform(() async {
+    await _platform.invoke<void>('renameSession', {
+      'id': id,
+      'name': name.trim(),
+    });
+    await _loadSessions();
+  }, success: 'Account renamed.');
 
   Future<void> delete(String id) => perform(() async {
     await _platform.invoke<void>('deleteSession', {'id': id});
     await _loadSessions();
-  }, success: 'Đã xóa người dùng và dữ liệu đăng nhập.');
+  }, success: 'Account and local sign-in data deleted.');
 }
