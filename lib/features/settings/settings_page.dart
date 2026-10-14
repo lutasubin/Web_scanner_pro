@@ -23,7 +23,7 @@ class SettingsPage extends StatelessWidget {
         leading: Icon(Icons.info_outline),
         title: Text('Phiên bản base 0.1.0'),
         subtitle: Text(
-          'Chỉ Android 10 trở lên. Gọi điện và tải tệp từ WebView chưa hỗ trợ.',
+          'Chỉ Android 10 trở lên. Phiên Web hỗ trợ camera, micro và gửi tài liệu, ảnh, video hoặc âm thanh.',
         ),
       ),
     ],

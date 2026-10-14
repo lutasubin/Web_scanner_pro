@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.pm.ApplicationInfo
 import android.webkit.CookieManager
 import android.webkit.PermissionRequest
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -19,6 +20,9 @@ object SessionWebConfiguration {
         status: (String) -> Unit,
         progress: (Int) -> Unit,
         pageReady: () -> Unit,
+        mediaPermission: (PermissionRequest) -> Unit,
+        mediaPermissionCancelled: (PermissionRequest) -> Unit,
+        fileChooser: (ValueCallback<Array<android.net.Uri>>, WebChromeClient.FileChooserParams) -> Boolean,
     ) {
         view.settings.apply {
             javaScriptEnabled = true
@@ -26,7 +30,9 @@ object SessionWebConfiguration {
             databaseEnabled = true
             cacheMode = WebSettings.LOAD_DEFAULT
             allowFileAccess = false
-            allowContentAccess = false
+            // The Android pickers return content:// URIs. This lets WebView read
+            // only the URI grants selected by the user for a WhatsApp upload.
+            allowContentAccess = true
             mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
             safeBrowsingEnabled = true
             setSupportMultipleWindows(false)
@@ -49,14 +55,15 @@ object SessionWebConfiguration {
                 progress(newProgress)
             }
             override fun onPermissionRequest(request: PermissionRequest) {
-                request.deny()
-                notice(activity, "Base chưa hỗ trợ camera, micro và gọi điện trong phiên web.")
+                mediaPermission(request)
+            }
+            override fun onPermissionRequestCanceled(request: PermissionRequest) {
+                mediaPermissionCancelled(request)
             }
             override fun onShowFileChooser(webView: WebView?, callback: android.webkit.ValueCallback<Array<android.net.Uri>>?,
                 params: FileChooserParams?): Boolean {
-                callback?.onReceiveValue(null)
-                notice(activity, "Base chưa hỗ trợ tải tệp lên WhatsApp Web.")
-                return true
+                if (callback == null || params == null) return false
+                return fileChooser(callback, params)
             }
         }
         view.setDownloadListener { _, _, _, _, _ ->

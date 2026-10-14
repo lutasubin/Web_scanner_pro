@@ -155,6 +155,15 @@ object WebMobileLayout {
           api.refresh=function(){
             var pane=document.querySelector("#pane-side,[data-testid='chat-list']");
             var main=document.querySelector('#main');
+            // WhatsApp temporarily removes #main while its media editor is
+            // mounted. Keep the established detail layout during that state;
+            // remapping the root here classifies the editor as an auxiliary
+            // pane, hides it, and drops the selected attachment.
+            if(api.mode==='detail'&&!main&&api.root&&api.root.isConnected&&
+               api.list&&api.list.isConnected){
+              api.apply();
+              return;
+            }
             var structureChanged=pane!==api.paneNode||main!==api.mainNode||
               !api.root||!api.root.isConnected||!api.list||!api.list.isConnected;
             if(structureChanged)api.mark();
