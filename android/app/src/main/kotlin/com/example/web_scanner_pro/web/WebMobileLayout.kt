@@ -14,16 +14,22 @@ object WebMobileLayout {
             html,body,*{overscroll-behavior-x:none!important;box-sizing:border-box;}
             html,body{overflow-x:hidden!important;}
             *::-webkit-scrollbar:horizontal{height:0!important;display:none!important;}
-            [data-web-scanner-root]{width:100%!important;max-width:none!important;overflow:hidden!important;}
-            [data-web-scanner-pane]{width:100%!important;min-width:100%!important;max-width:100%!important;flex:1 1 100%!important;}
+            [data-web-scanner-root]{display:flex!important;width:100%!important;min-width:100%!important;max-width:100%!important;overflow:hidden!important;}
+            [data-web-scanner-pane='nav']{display:flex!important;visibility:visible!important;width:56px!important;min-width:56px!important;max-width:56px!important;flex:0 0 56px!important;transform:none!important;}
+            [data-web-scanner-pane='list']{width:calc(100% - 56px)!important;min-width:calc(100% - 56px)!important;max-width:calc(100% - 56px)!important;flex:0 0 calc(100% - 56px)!important;overflow:hidden!important;}
+            [data-web-scanner-pane='detail']{width:100%!important;min-width:100%!important;max-width:100%!important;flex:0 0 100%!important;overflow:hidden!important;}
             body.web-scanner-list [data-web-scanner-pane='detail'],
             body.web-scanner-list [data-web-scanner-pane='aux'],
+            body.web-scanner-detail [data-web-scanner-pane='nav'],
             body.web-scanner-detail [data-web-scanner-pane='list'],
             body.web-scanner-detail [data-web-scanner-pane='aux']{display:none!important;}
+            body.web-scanner-list [data-web-scanner-pane='nav'],
             body.web-scanner-list [data-web-scanner-pane='list'],
             body.web-scanner-detail [data-web-scanner-pane='detail']{display:flex!important;visibility:visible!important;transform:none!important;}
             body.web-scanner-list #pane-side,
-            body.web-scanner-detail #main{width:100%!important;min-width:100%!important;max-width:100%!important;}
+            body.web-scanner-detail #main{width:100%!important;min-width:100%!important;max-width:100%!important;overflow:hidden!important;}
+            body.web-scanner-list [data-web-scanner-pane='list']>header,
+            body.web-scanner-list #side{width:100%!important;min-width:100%!important;max-width:100%!important;}
             #web-scanner-chat-back{display:flex!important;align-items:center!important;justify-content:center!important;width:44px!important;min-width:44px!important;height:44px!important;margin:0 2px 0 0!important;padding:0!important;border:0!important;background:transparent!important;color:#111!important;font:400 34px/1 sans-serif!important;cursor:pointer!important;}
           `;
           document.documentElement.style.zoom='$scale';
@@ -50,7 +56,7 @@ object WebMobileLayout {
             return node;
           }
 
-          var api={mode:'list',root:null,list:null,detail:null};
+          var api={mode:'list',root:null,nav:null,list:null,detail:null,paneNode:null,mainNode:null};
 
           api.findListRoot=function(pane){
             var branch=pane;
@@ -84,6 +90,21 @@ object WebMobileLayout {
             }
             if(!root||!listBranch)return false;
 
+            var navBranch=Array.from(root.children).find(function(child){
+              var labels=Array.from(child.querySelectorAll('[aria-label]')).map(function(node){
+                return (node.getAttribute('aria-label')||'').toLowerCase();
+              });
+              var hasChats=labels.some(function(label){return label==='chats'||label.includes('đoạn chat');});
+              var hasCalls=labels.some(function(label){return label==='calls'||label.includes('cuộc gọi');});
+              var hasStatus=labels.some(function(label){return label==='status'||label.includes('trạng thái');});
+              return hasChats&&(hasCalls||hasStatus);
+            });
+            if(api.root===root&&api.nav===navBranch&&api.list===listBranch&&
+               api.detail===detailBranch&&root.isConnected&&listBranch.isConnected){
+              api.paneNode=pane;api.mainNode=main;
+              return true;
+            }
+
             document.querySelectorAll('[data-web-scanner-pane]').forEach(function(node){
               node.removeAttribute('data-web-scanner-pane');
             });
@@ -91,14 +112,16 @@ object WebMobileLayout {
               node.removeAttribute('data-web-scanner-root');
             });
             root.setAttribute('data-web-scanner-root','true');
+            if(navBranch)navBranch.setAttribute('data-web-scanner-pane','nav');
             listBranch.setAttribute('data-web-scanner-pane','list');
             if(detailBranch)detailBranch.setAttribute('data-web-scanner-pane','detail');
             Array.from(root.children).forEach(function(child){
-              if(child===listBranch||child===detailBranch)return;
+              if(child===navBranch||child===listBranch||child===detailBranch)return;
               var box=child.getBoundingClientRect();
               if(box.height>window.innerHeight*0.55)child.setAttribute('data-web-scanner-pane','aux');
             });
-            api.root=root;api.list=listBranch;api.detail=detailBranch;
+            api.root=root;api.nav=navBranch;api.list=listBranch;api.detail=detailBranch;
+            api.paneNode=pane;api.mainNode=main;
             return true;
           };
 
@@ -122,7 +145,6 @@ object WebMobileLayout {
             document.body.classList.toggle('web-scanner-list',api.mode==='list');
             document.body.classList.toggle('web-scanner-detail',api.mode==='detail');
             api.addBackButton();
-            window.scrollTo(0,0);
           };
           api.showList=function(){api.mode='list';api.mark();api.apply();};
           api.showDetail=function(){
@@ -131,8 +153,13 @@ object WebMobileLayout {
             api.mode='detail';api.apply();return true;
           };
           api.refresh=function(){
-            api.mark();
-            if(api.mode==='detail'&&!document.querySelector('#main'))api.mode='list';
+            var pane=document.querySelector("#pane-side,[data-testid='chat-list']");
+            var main=document.querySelector('#main');
+            var structureChanged=pane!==api.paneNode||main!==api.mainNode||
+              !api.root||!api.root.isConnected||!api.list||!api.list.isConnected;
+            if(structureChanged)api.mark();
+            if(api.mode==='detail'&&!(api.detail&&api.detail.isConnected)&&
+               !document.querySelector('#main'))api.mode='list';
             api.apply();
           };
           window.__webScannerMobileLayout=api;
@@ -148,8 +175,12 @@ object WebMobileLayout {
 
           if(!window.__webScannerMobileObserver){
             window.__webScannerMobileObserver=new MutationObserver(function(){
+              var pane=document.querySelector("#pane-side,[data-testid='chat-list']");
+              var main=document.querySelector('#main');
+              if(pane===api.paneNode&&main===api.mainNode&&
+                 api.root&&api.root.isConnected&&api.list&&api.list.isConnected)return;
               clearTimeout(window.__webScannerMobileTimer);
-              window.__webScannerMobileTimer=setTimeout(function(){api.refresh();},80);
+              window.__webScannerMobileTimer=setTimeout(function(){api.refresh();},160);
             });
             window.__webScannerMobileObserver.observe(document.body,{childList:true,subtree:true});
           }

@@ -1,5 +1,6 @@
 package com.example.web_scanner_pro.web
 
+import android.app.DownloadManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -7,6 +8,7 @@ import android.content.Intent
 import android.graphics.Color
 import android.view.View
 import android.view.ViewGroup
+import android.view.inputmethod.InputMethodManager
 import android.webkit.WebView
 import android.app.AlertDialog
 import android.text.InputFilter
@@ -77,6 +79,8 @@ class WebSessionActivity : ComponentActivity() {
             onSelect = ::switchSession,
             onAdd = ::showCreateAccount,
             onReload = { view.reload() },
+            onKeyboard = { showKeyboard(view) },
+            onDownloads = ::openDownloads,
             onHelp = ::showHelp,
         ).build())
         message = TextView(this).apply {
@@ -115,7 +119,10 @@ class WebSessionActivity : ComponentActivity() {
 
     private fun installMobileLayout(view: WebView) {
         val widthDp = view.width / resources.displayMetrics.density
-        val scale = (widthDp / 420f).coerceIn(0.78f, 1f)
+        // Giữ chữ và hàng chat ở kích thước mobile dễ đọc thay vì thu nhỏ cả
+        // trang desktop. Phần chiều rộng mở rộng bù lại mức zoom để không tạo
+        // cuộn ngang.
+        val scale = (widthDp / 360f).coerceIn(0.9f, 1.18f)
         val expandedWidth = 100f / scale
         view.evaluateJavascript(WebMobileLayout.install(scale, expandedWidth), null)
     }
@@ -232,6 +239,22 @@ class WebSessionActivity : ComponentActivity() {
             .show()
     }
 
+    private fun showKeyboard(view: WebView) {
+        view.requestFocus()
+        val keyboard = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+        if (!keyboard.showSoftInput(view, InputMethodManager.SHOW_IMPLICIT)) {
+            Toast.makeText(this, "Chạm vào ô nhập tin nhắn để mở bàn phím.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun openDownloads() {
+        try {
+            startActivity(Intent(DownloadManager.ACTION_VIEW_DOWNLOADS))
+        } catch (_: Exception) {
+            Toast.makeText(this, "Không mở được thư mục Tải xuống trên thiết bị này.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     private fun showProgress(value: Int) {
         if (value < 100) {
             progress.visibility = View.VISIBLE
@@ -298,4 +321,5 @@ class WebSessionActivity : ComponentActivity() {
     }
     override fun onResume() { super.onResume(); webView?.onResume() }
     override fun onDestroy() { disposeWebView(); super.onDestroy() }
+
 }
