@@ -12,9 +12,7 @@ import android.os.Handler
 import android.os.Looper
 import android.graphics.Color
 import android.provider.MediaStore
-import android.provider.OpenableColumns
 import android.util.Log
-import android.webkit.MimeTypeMap
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
@@ -81,9 +79,6 @@ class WebSessionActivity : ComponentActivity() {
             result.resultCode == Activity.RESULT_OK && it.second.length() > 0L
         }?.first
         val selected = extractSelectedUris(result.resultCode, result.data, captured)
-            ?.mapNotNull(::copyToUploadCache)
-            ?.toTypedArray()
-            ?.takeIf { it.isNotEmpty() }
         clearPendingFileRequest()
         callback.onReceiveValue(selected)
         handler.postDelayed({
@@ -317,6 +312,8 @@ class WebSessionActivity : ComponentActivity() {
     private fun extractSelectedUris(resultCode: Int, data: Intent?, captured: Uri?): Array<Uri>? {
         if (resultCode != Activity.RESULT_OK) return null
         val rawUris = buildList {
+            WebChromeClient.FileChooserParams.parseResult(resultCode, data)
+                ?.forEach(::add)
             data?.clipData?.let { clip ->
                 for (index in 0 until clip.itemCount) {
                     clip.getItemAt(index).uri?.let(::add)
@@ -335,36 +332,12 @@ class WebSessionActivity : ComponentActivity() {
                 .getOrDefault(false)
         }
         Log.i(FILE_CHOOSER_LOG, "verifiedUris=$uris")
-        // Android's Photo Picker can include an extra compatibility URI in
-        // ClipData even when its UI reports one selected item. WhatsApp treats
-        // the whole selection as cancelled if that extra URI cannot become a
-        // browser File, so deliver the first verified user selection.
-        return uris.firstOrNull()?.let { arrayOf(it) }
+        // Return the picker-owned content URIs exactly as Android supplied
+        // them. Copying them through FileProvider loses the original display
+        // name/type on some photo pickers, so Chromium cannot construct the
+        // browser File expected by WhatsApp's attachment editor.
+        return uris.toTypedArray().takeIf { it.isNotEmpty() }
     }
-
-    private fun copyToUploadCache(source: Uri): Uri? = runCatching {
-        if (source.authority == "$packageName.fileprovider") return@runCatching source
-        val mimeType = contentResolver.getType(source)
-        val displayName = contentResolver.query(
-            source,
-            arrayOf(OpenableColumns.DISPLAY_NAME),
-            null,
-            null,
-            null,
-        )?.use { cursor ->
-            if (cursor.moveToFirst()) cursor.getString(0) else null
-        }
-        val extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType)
-            ?: displayName?.substringAfterLast('.', "")?.takeIf { it.isNotBlank() }
-            ?: "bin"
-        val directory = File(cacheDir, "web_uploads").apply { mkdirs() }
-        val file = File.createTempFile("whatsapp_upload_", ".${extension.lowercase()}", directory)
-        contentResolver.openInputStream(source)?.use { input ->
-            file.outputStream().use(input::copyTo)
-        } ?: error("Cannot open selected media")
-        FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
-    }.onFailure { Log.e(FILE_CHOOSER_LOG, "Cannot cache $source", it) }
-        .getOrNull()
 
     private fun createPickerIntent(params: WebChromeClient.FileChooserParams): Intent = try {
         params.createIntent().apply {
