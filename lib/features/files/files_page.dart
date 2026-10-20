@@ -55,7 +55,7 @@ class _FilesPageState extends State<FilesPage> {
             ? const EmptyState(
                 icon: Icons.folder_open,
                 title: 'Chưa có tệp đã lưu',
-                description: 'Các bản sao trạng thái sẽ xuất hiện ở đây.',
+                description: 'Status và tệp tải từ phiên Web sẽ xuất hiện ở đây.',
               )
             : Column(
                 children: c.items

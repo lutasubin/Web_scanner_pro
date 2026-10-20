@@ -47,6 +47,7 @@ class WebSessionActivity : ComponentActivity() {
     private lateinit var progress: ProgressBar
     private lateinit var qrOverlay: QrLoginOverlay
     private lateinit var phoneOverlay: PhoneLoginOverlay
+    private lateinit var downloadHandler: WebDownloadHandler
     private val handler = Handler(Looper.getMainLooper())
     private var readyChecks = 0
     private var pendingMediaRequest: PermissionRequest? = null
@@ -119,10 +120,12 @@ class WebSessionActivity : ComponentActivity() {
             val view = FixedWidthWebView(this)
             webView = view
             if (WebBridge.supportsProfiles()) WebViewCompat.setProfile(view, SessionProfiles.name(sessionId))
+            downloadHandler = WebDownloadHandler(applicationContext, ::showMessage)
+            downloadHandler.attach(view)
             buildLayout(view)
             SessionWebConfiguration.configure(view, this, ::showMessage,
                 ::showProgress, ::waitForWebContent, ::handleMediaPermission,
-                ::cancelMediaPermission, ::showFileChooser)
+                ::cancelMediaPermission, ::showFileChooser, downloadHandler::download)
             SessionProfiles.register(this)
             onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
                 override fun handleOnBackPressed() {
@@ -568,6 +571,7 @@ class WebSessionActivity : ComponentActivity() {
         pendingFileCallback?.onReceiveValue(null)
         clearPendingFileRequest()
         webView?.let { view ->
+            if (::downloadHandler.isInitialized) downloadHandler.detach(view)
             (view.parent as? ViewGroup)?.removeView(view)
             view.stopLoading()
             view.destroy()

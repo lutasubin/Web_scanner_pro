@@ -41,6 +41,6 @@ Triển khai song song sau P0: Flutter UI/data contracts; Web/profile/history; S
 
 ## Sau base
 
-Chỉ mở rộng account manager/monetization sau khi P6 ổn. Technical spikes tiếp theo: blob media download, attachment upload, background behavior, phát hiện session state không dựa DOM mong manh, status directory tương thích OEM, notification MessagingStyle nâng cao. Ads/IAP cần product decision, consent, pricing, restore purchase và test riêng.
+Chỉ mở rộng account manager/monetization sau khi P6 ổn. Technical spikes tiếp theo: attachment upload, tải nền bền vững khi Activity bị đóng, phát hiện session state không dựa DOM mong manh, status directory tương thích OEM, notification MessagingStyle nâng cao. Ads/IAP cần product decision, consent, pricing, restore purchase và test riêng.
 
 Release gate: applicationId riêng, icon/brand riêng, release keystore của chủ dự án, privacy công khai phản ánh data flow thực, store listing không hứa phục hồi dữ liệu bất khả thi. Debug APK không phải AAB ký để phát hành.

@@ -44,7 +44,7 @@ Không yêu cầu Accessibility, danh bạ, SMS, gọi điện hoặc quyền qu
 
 ## Chưa thuộc base
 
-Ads/UMP/IAP, Firebase, backend, gọi thoại/video, call log, download `blob:` đầy đủ, khôi phục media đã biến mất, app lock sinh trắc, background Web sync liên tục, phân phối Google Play. Các mục này phải được ghi rõ trong delivery, không đánh dấu hoàn thành chỉ vì có màn hình.
+Ads/UMP/IAP, Firebase, backend, gọi thoại/video, call log, khôi phục media đã biến mất, app lock sinh trắc, background Web sync liên tục, phân phối Google Play. Các mục này phải được ghi rõ trong delivery, không đánh dấu hoàn thành chỉ vì có màn hình.
 
 ## Tiêu chí UX
 

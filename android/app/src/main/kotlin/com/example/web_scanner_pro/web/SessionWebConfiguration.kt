@@ -23,6 +23,7 @@ object SessionWebConfiguration {
         mediaPermission: (PermissionRequest) -> Unit,
         mediaPermissionCancelled: (PermissionRequest) -> Unit,
         fileChooser: (ValueCallback<Array<android.net.Uri>>, WebChromeClient.FileChooserParams) -> Boolean,
+        download: (WebView, String, String?, String?, String?, Long) -> Unit,
     ) {
         view.settings.apply {
             javaScriptEnabled = true
@@ -66,8 +67,12 @@ object SessionWebConfiguration {
                 return fileChooser(callback, params)
             }
         }
-        view.setDownloadListener { _, _, _, _, _ ->
-            notice(activity, "Base chưa hỗ trợ tải tệp từ phiên web. Bạn có thể lưu Status từ thư mục đã cấp quyền.")
+        view.setDownloadListener { url, userAgent, disposition, mimeType, length ->
+            if (url.isNullOrBlank()) {
+                notice(activity, "Không tìm thấy địa chỉ tệp để tải xuống.")
+            } else {
+                download(view, url, userAgent, disposition, mimeType, length)
+            }
         }
     }
 
@@ -79,6 +84,8 @@ object SessionWebConfiguration {
     }
 
     fun flushCookies(view: WebView) = cookieManager(view).flush()
+
+    fun cookiesFor(view: WebView, url: String): String? = cookieManager(view).getCookie(url)
 
     private fun cookieManager(view: WebView): CookieManager =
         if (WebBridge.supportsProfiles()) {

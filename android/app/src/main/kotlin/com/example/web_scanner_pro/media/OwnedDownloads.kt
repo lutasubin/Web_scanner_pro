@@ -14,6 +14,9 @@ internal class OwnedDownloads(context: Context) {
 
     fun save(source: MediaRecord) = writer.save(source)
 
+    internal fun open(name: String, mimeType: String): PendingDownload =
+        writer.open(name, mimeType)
+
     fun list(): List<MediaRecord> {
         val files = mutableListOf<MediaRecord>()
         for (id in registry.all()) {

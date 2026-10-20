@@ -21,6 +21,7 @@ class AppCopy {
       'ảnh/video gốc hoặc tin nhắn từ tài khoản Web trên máy khác.';
   static const filesNote =
       'Bản sao được lưu ở Downloads/WebScannerPro. '
+      'Bao gồm Status đã lưu và tệp tải từ phiên Web. '
       'Tệp đã xuất có thể vẫn còn sau khi gỡ ứng dụng.';
   static const genericError = 'Không thể hoàn tất thao tác. Vui lòng thử lại.';
 }

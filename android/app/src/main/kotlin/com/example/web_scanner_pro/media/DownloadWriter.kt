@@ -2,9 +2,10 @@ package com.example.web_scanner_pro.media
 
 import android.content.ContentValues
 import android.content.Context
+import android.net.Uri
 import android.provider.MediaStore
 import java.io.IOException
-import java.util.UUID
+import java.io.OutputStream
 
 internal class DownloadWriter(
     context: Context,
@@ -14,10 +15,22 @@ internal class DownloadWriter(
     private val resolver = context.contentResolver
 
     fun save(source: MediaRecord) {
-        val safeName = source.name.replace(Regex("[^a-zA-Z0-9._-]"), "_").takeLast(100)
+        val target = open(source.name, source.mimeType)
+        try {
+            resolver.openInputStream(source.uri)?.use { input -> input.copyTo(target.output) }
+                ?: throw IOException("Cannot read status")
+            target.publish()
+        } catch (error: Exception) {
+            target.abort()
+            throw error
+        }
+    }
+
+    fun open(name: String, mimeType: String): PendingDownload {
+        val safeName = safeName(name)
         val values = ContentValues().apply {
-            put(MediaStore.MediaColumns.DISPLAY_NAME, "${UUID.randomUUID()}_$safeName")
-            put(MediaStore.MediaColumns.MIME_TYPE, source.mimeType)
+            put(MediaStore.MediaColumns.DISPLAY_NAME, safeName)
+            put(MediaStore.MediaColumns.MIME_TYPE, mimeType.ifBlank { "application/octet-stream" })
             put(MediaStore.MediaColumns.RELATIVE_PATH, query.directory)
             put(MediaStore.MediaColumns.IS_PENDING, 1)
         }
@@ -25,16 +38,65 @@ internal class DownloadWriter(
         try {
             // Lưu URI trước khi copy để dọn bản ghi pending nếu tiến trình bị dừng.
             registry.add(destination)
-            resolver.openInputStream(source.uri)?.use { input ->
-                val output = resolver.openOutputStream(destination, "w") ?: throw IOException("Cannot write download")
-                output.use { input.copyTo(it) }
-            } ?: throw IOException("Cannot read status")
-            val ready = ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }
-            if (resolver.update(destination, ready, null, null) != 1) throw IOException("Cannot publish download")
+            val output = resolver.openOutputStream(destination, "w")
+                ?: throw IOException("Cannot write download")
+            return PendingDownload(destination, output, resolver, registry)
         } catch (error: Exception) {
             runCatching { resolver.delete(destination, null, null) }
             runCatching { registry.remove(destination) }
             throw error
         }
+    }
+
+    private fun safeName(value: String): String {
+        val cleaned = value.trim()
+            .replace(Regex("[\\\\/:*?\"<>|\\p{Cntrl}]"), "_")
+            .trim('.', ' ')
+            .takeLast(160)
+        return cleaned.ifBlank { "whatsapp_download" }
+    }
+}
+
+internal class PendingDownload(
+    val uri: Uri,
+    val output: OutputStream,
+    private val resolver: android.content.ContentResolver,
+    private val registry: OwnedFileRegistry,
+) {
+    private var closed = false
+
+    @Synchronized
+    fun write(bytes: ByteArray) {
+        if (closed) throw IOException("Download is closed")
+        output.write(bytes)
+    }
+
+    @Synchronized
+    fun publish() {
+        if (closed) return
+        try {
+            output.flush()
+            output.close()
+            val ready = ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }
+            if (resolver.update(uri, ready, null, null) != 1) {
+                throw IOException("Cannot publish download")
+            }
+            closed = true
+        } catch (error: Exception) {
+            abortInternal()
+            throw error
+        }
+    }
+
+    @Synchronized
+    fun abort() {
+        if (!closed) abortInternal()
+    }
+
+    private fun abortInternal() {
+        closed = true
+        runCatching { output.close() }
+        runCatching { resolver.delete(uri, null, null) }
+        runCatching { registry.remove(uri) }
     }
 }
