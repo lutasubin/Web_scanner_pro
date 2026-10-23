@@ -15,8 +15,10 @@ object WebMobileLayout {
             html,body{overflow-x:hidden!important;}
             *::-webkit-scrollbar:horizontal{height:0!important;display:none!important;}
             [data-web-scanner-root]{display:flex!important;width:100%!important;min-width:100%!important;max-width:100%!important;overflow:hidden!important;}
+            [data-web-scanner-content]{display:flex!important;left:56px!important;right:0!important;width:calc(100% - 56px)!important;min-width:calc(100% - 56px)!important;max-width:calc(100% - 56px)!important;flex:0 0 calc(100% - 56px)!important;overflow:hidden!important;}
             [data-web-scanner-pane='nav']{display:flex!important;visibility:visible!important;width:56px!important;min-width:56px!important;max-width:56px!important;flex:0 0 56px!important;transform:none!important;}
             [data-web-scanner-pane='list']{width:calc(100% - 56px)!important;min-width:calc(100% - 56px)!important;max-width:calc(100% - 56px)!important;flex:0 0 calc(100% - 56px)!important;overflow:hidden!important;}
+            [data-web-scanner-content] [data-web-scanner-pane='list']{width:100%!important;min-width:100%!important;max-width:100%!important;flex:0 0 100%!important;margin-left:0!important;}
             [data-web-scanner-pane='detail']{width:100%!important;min-width:100%!important;max-width:100%!important;flex:0 0 100%!important;overflow:hidden!important;}
             body.web-scanner-list [data-web-scanner-pane='detail'],
             body.web-scanner-list [data-web-scanner-pane='aux'],
@@ -25,6 +27,7 @@ object WebMobileLayout {
             body.web-scanner-list [data-web-scanner-pane='nav'],
             body.web-scanner-list [data-web-scanner-pane='list'],
             body.web-scanner-detail [data-web-scanner-pane='detail']{display:flex!important;visibility:visible!important;transform:none!important;}
+            body.web-scanner-detail [data-web-scanner-content]{left:0!important;width:100%!important;min-width:100%!important;max-width:100%!important;flex-basis:100%!important;}
             body.web-scanner-list #pane-side,
             body.web-scanner-detail #main{width:100%!important;min-width:100%!important;max-width:100%!important;overflow:hidden!important;}
             body.web-scanner-list [data-web-scanner-pane='list']>header,
@@ -94,7 +97,7 @@ object WebMobileLayout {
           document.documentElement.style.overflowX='hidden';
           document.body.style.overflowX='hidden';
 
-          var VERSION=12;
+          var VERSION=13;
           if(window.__webScannerMobileLayout&&window.__webScannerMobileLayout.version===VERSION){
             window.__webScannerMobileLayout.refresh();
             return 'updated';
@@ -119,7 +122,7 @@ object WebMobileLayout {
             return node;
           }
 
-          var api={version:VERSION,mode:'list',root:null,nav:null,list:null,detail:null,paneNode:null,mainNode:null};
+          var api={version:VERSION,mode:'list',root:null,content:null,nav:null,list:null,detail:null,paneNode:null,mainNode:null};
 
           api.updateViewport=function(){
             var viewport=window.visualViewport;
@@ -209,10 +212,21 @@ object WebMobileLayout {
 
           api.mark=function(){
             var pane=document.querySelector("#pane-side,[data-testid='chat-list']");
-            if(!pane)return false;
             var main=document.querySelector('#main');
-            var root=null,listBranch=null,detailBranch=null;
-            if(main){
+            var root=null,contentBranch=null,navBranch=null,listBranch=null,detailBranch=null;
+            var callsList=pane&&pane.closest("[data-testid='drawer-left']");
+            var callsDetail=callsList&&callsList.parentElement&&
+              callsList.parentElement.querySelector(":scope > [data-testid='drawer-middle']");
+            var navigationHeader=Array.from(document.querySelectorAll("[data-testid='chatlist-header']")).find(function(header){
+              return header.querySelector("[data-testid='navbar-primary-section']");
+            });
+            if(!main&&callsList&&callsDetail&&navigationHeader){
+              root=commonAncestor(navigationHeader,callsList);
+              contentBranch=commonAncestor(callsList,callsDetail);
+              navBranch=directChild(root,navigationHeader);
+              listBranch=directChild(contentBranch,callsList);
+              detailBranch=directChild(contentBranch,callsDetail);
+            }else if(pane&&main){
               root=commonAncestor(pane,main);
               if(root&&root!==document.body&&root!==document.documentElement){
                 listBranch=directChild(root,pane);
@@ -220,13 +234,13 @@ object WebMobileLayout {
                 if(listBranch===detailBranch){root=null;listBranch=null;detailBranch=null;}
               }
             }
-            if(!root){
+            if(!root&&pane){
               var found=api.findListRoot(pane);
               if(found){root=found.root;listBranch=found.list;}
             }
             if(!root||!listBranch)return false;
 
-            var navBranch=Array.from(root.children).find(function(child){
+            navBranch=navBranch||Array.from(root.children).find(function(child){
               var labels=Array.from(child.querySelectorAll('[aria-label]')).map(function(node){
                 return (node.getAttribute('aria-label')||'').toLowerCase();
               });
@@ -235,7 +249,8 @@ object WebMobileLayout {
               var hasStatus=labels.some(function(label){return label==='status'||label.includes('trạng thái');});
               return hasChats&&(hasCalls||hasStatus);
             });
-            if(api.root===root&&api.nav===navBranch&&api.list===listBranch&&
+
+            if(api.root===root&&api.content===contentBranch&&api.nav===navBranch&&api.list===listBranch&&
                api.detail===detailBranch&&root.isConnected&&listBranch.isConnected){
               api.paneNode=pane;api.mainNode=main;
               return true;
@@ -247,16 +262,21 @@ object WebMobileLayout {
             document.querySelectorAll('[data-web-scanner-root]').forEach(function(node){
               node.removeAttribute('data-web-scanner-root');
             });
+            document.querySelectorAll('[data-web-scanner-content]').forEach(function(node){
+              node.removeAttribute('data-web-scanner-content');
+            });
             root.setAttribute('data-web-scanner-root','true');
+            if(contentBranch)contentBranch.setAttribute('data-web-scanner-content','true');
             if(navBranch)navBranch.setAttribute('data-web-scanner-pane','nav');
             listBranch.setAttribute('data-web-scanner-pane','list');
             if(detailBranch)detailBranch.setAttribute('data-web-scanner-pane','detail');
             Array.from(root.children).forEach(function(child){
-              if(child===navBranch||child===listBranch||child===detailBranch)return;
+              if(child===contentBranch||child===navBranch||child===listBranch||child===detailBranch)return;
               var box=child.getBoundingClientRect();
               if(box.height>window.innerHeight*0.55)child.setAttribute('data-web-scanner-pane','aux');
             });
-            api.root=root;api.nav=navBranch;api.list=listBranch;api.detail=detailBranch;
+            api.root=root;api.content=contentBranch;api.nav=navBranch;
+            api.list=listBranch;api.detail=detailBranch;
             api.paneNode=pane;api.mainNode=main;
             return true;
           };
@@ -393,6 +413,9 @@ object WebMobileLayout {
             document.body.classList.toggle('web-scanner-detail',api.mode==='detail');
             api.addBackButton();
             api.markMobileSurfaces();
+            if(window.Android&&window.Android.postMessage){
+              window.Android.postMessage(api.mode==='detail'?'entryMessageDetail':'leaveMessageDetail');
+            }
           };
           api.showList=function(){api.mode='list';api.mark();api.apply();};
           api.showDetail=function(){
@@ -461,11 +484,204 @@ object WebMobileLayout {
         })()
     """.trimIndent()
 
+    const val MODE_QR = "toQR"
+    const val MODE_CODE = "toCode"
+
     const val BACK_SCRIPT = """
         (function(){
+          try {
+            document.dispatchEvent(new KeyboardEvent('keydown', {
+              key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true
+            }));
+          } catch (e) {}
           var api=window.__webScannerMobileLayout;
-          if(api&&api.mode==='detail'){api.showList();return true;}
+          if(api&&api.mode==='detail'){
+            api.showList();
+            if(window.Android&&window.Android.postMessage){
+              window.Android.postMessage('leaveMessageDetail');
+            }
+            return true;
+          }
           return false;
         })()
     """
+
+    /**
+     * Clicks WhatsApp Web's own "Link with phone number" / "Link with QR code" link button
+     * on the live page, matching `WebActivity.changeLoginMode()` in the original app.
+     */
+    const val TOGGLE_LOGIN_MODE_SCRIPT = """
+        (function(){
+          var arrows = document.querySelectorAll('span[data-icon="wa-brand-arrow-right"]');
+          if (arrows && arrows.length > 0) {
+            var btn = arrows[0].closest('button,[role="button"],a,div[tabindex]') || arrows[0];
+            btn.click();
+            return 'clicked-arrow';
+          }
+          var chevrons = document.querySelectorAll('span[data-icon="chevron"]');
+          if (chevrons && chevrons.length > 0) {
+            var last = chevrons[chevrons.length - 1];
+            var cBtn = last.closest('button,[role="button"],a,div[tabindex]') || last;
+            cBtn.click();
+            return 'clicked-chevron';
+          }
+          var items = Array.from(document.querySelectorAll('button,a,[role="button"],span[role="button"]'));
+          var target = items.find(function(e){
+            var t = (e.innerText || e.textContent || '').toLowerCase();
+            return t.includes('phone number') || t.includes('số điện thoại') ||
+                   t.includes('qr code') || t.includes('mã qr');
+          });
+          if (target) {
+            target.click();
+            return 'clicked-text';
+          }
+          return 'not-found';
+        })()
+    """
+
+    /**
+     * Installs the pre-login & post-login DOM observer matching `y.java` + `WebActivity.java`
+     * in the original app:
+     * - Scales the login card cleanly to mobile screen width (`window.innerWidth / 580`)
+     * - Detects QR mode (`toQR`) vs Phone Number / Code mode (`toCode`)
+     * - Formats the 8-character phone link code (`flexWrap = 'wrap'`) and auto-copies `data-link-code`
+     * - Detects login completion (`logSuccess`)
+     * - Intercepts input taps when Keyboard Lock is enabled (`openKeyBroad`)
+     */
+    fun installDualAppObserver(webMode: Int, keyboardLocked: Boolean): String = """
+        (function(){
+          window.__webScannerKeyboardLocked = $keyboardLocked;
+          window.__webScannerWebMode = $webMode;
+
+          if (!window.__webScannerOriginalFocus) {
+            window.__webScannerOriginalFocus = HTMLInputElement.prototype.focus;
+          }
+          HTMLInputElement.prototype.focus = function() {
+            if (window.__webScannerKeyboardLocked) return;
+            return window.__webScannerOriginalFocus.apply(this, arguments);
+          };
+
+          if (!window.__webScannerKbClickInstalled) {
+            window.__webScannerKbClickInstalled = true;
+            function checkInputNode(node) {
+              if (!node || !node.classList) return false;
+              var tag = (node.tagName || '').toUpperCase();
+              if (tag === 'DIV' && (
+                  node.classList.contains('html-input') ||
+                  node.classList.contains('selectable-text') ||
+                  node.classList.contains('copyable-text') ||
+                  node.getAttribute('contenteditable') === 'true'
+              )) return true;
+              if (tag === 'P' && node.classList.contains('copyable-text')) return true;
+              if (tag === 'INPUT' || tag === 'TEXTAREA') return true;
+              return false;
+            }
+            document.addEventListener('click', function(ev) {
+              if (!window.__webScannerKeyboardLocked) return;
+              var t = ev.target;
+              if (!t) return;
+              if (checkInputNode(t) || (t.closest && t.closest('[contenteditable="true"],input,textarea,.copyable-text,.selectable-text'))) {
+                if (window.Android && window.Android.postMessage) {
+                  window.Android.postMessage('openKeyBroad');
+                }
+              }
+            }, true);
+          }
+
+          function syncState() {
+            var hasMainHeader = Boolean(
+              document.querySelector("#pane-side,[data-testid='chat-list'],header,[data-testid='chatlist-header']")
+            );
+            if (hasMainHeader) {
+              if (!window.__webScannerLoggedSuccessSent) {
+                window.__webScannerLoggedSuccessSent = true;
+                if (window.Android && window.Android.postMessage) {
+                  window.Android.postMessage('logSuccess');
+                }
+              }
+              if (window.__webScannerWebMode === 1) {
+                var styleEl = document.getElementById('web-scanner-mobile-layout');
+                if (styleEl) styleEl.remove();
+                document.documentElement.style.zoom = '1';
+                document.documentElement.style.width = '100%';
+                document.body.style.zoom = '1';
+                document.body.classList.remove('web-scanner-list', 'web-scanner-detail');
+              }
+              return 'chat';
+            }
+
+            window.__webScannerLoggedSuccessSent = false;
+
+            // Pre-login: scale the 580px WhatsApp Web login card to fit the mobile screen cleanly
+            var loginZoom = Math.min(1, Math.max(0.52, window.innerWidth / 580));
+            document.documentElement.style.zoom = '1';
+            document.documentElement.style.width = '100%';
+            document.body.style.zoom = String(loginZoom);
+            var appNode = document.getElementById('app');
+            if (appNode && appNode.firstElementChild) {
+              appNode.firstElementChild.style.overflowX = 'hidden';
+            }
+
+            var qrNode = document.querySelector('div[data-ref^="https://wa.me/settings/linked_devices"],[data-testid="qrcode"],canvas');
+            if (qrNode) {
+              if (!window.__webScannerOpenedQrHelper) {
+                window.__webScannerOpenedQrHelper = true;
+                if (window.Android && window.Android.postMessage) {
+                  window.Android.postMessage('openHelper');
+                }
+              }
+              if (window.__webScannerLoginMode !== 'QR') {
+                window.__webScannerLoginMode = 'QR';
+                if (window.Android && window.Android.postMessage) {
+                  window.Android.postMessage('toQR');
+                }
+              }
+            }
+
+            var codeScreen = document.querySelector('div[aria-details="link-device-phone-number-code-screen-instructions"]');
+            if (codeScreen && codeScreen.children && codeScreen.children.length > 0) {
+              var codeRow = codeScreen.children[0];
+              codeRow.style.display = 'flex';
+              codeRow.style.flexWrap = 'wrap';
+              codeRow.style.justifyContent = 'center';
+              codeRow.style.gap = '6px';
+              if (!window.__webScannerOpenedCodeHelper) {
+                window.__webScannerOpenedCodeHelper = true;
+                if (window.Android && window.Android.postMessage) {
+                  window.Android.postMessage('openCodeHelper');
+                }
+              }
+              var linkCode = codeScreen.getAttribute('data-link-code');
+              if (linkCode && window.__webScannerLastCopiedCode !== linkCode) {
+                window.__webScannerLastCopiedCode = linkCode;
+                if (window.Android && window.Android.copyCode) {
+                  window.Android.copyCode(linkCode);
+                }
+              }
+            }
+
+            var phoneForm = document.querySelector('form,input[type="tel"],div[aria-details="link-device-phone-number-code-screen-instructions"]');
+            if (phoneForm && !qrNode) {
+              if (window.__webScannerLoginMode !== 'CODE') {
+                window.__webScannerLoginMode = 'CODE';
+                if (window.Android && window.Android.postMessage) {
+                  window.Android.postMessage('toCode');
+                }
+              }
+            }
+            return qrNode || phoneForm ? 'login' : 'loading';
+          }
+
+          if (!window.__webScannerDualObserver) {
+            window.__webScannerDualObserver = new MutationObserver(function() {
+              clearTimeout(window.__webScannerDualTimer);
+              window.__webScannerDualTimer = setTimeout(syncState, 120);
+            });
+            if (document.body) {
+              window.__webScannerDualObserver.observe(document.body, { childList: true, subtree: true });
+            }
+          }
+          return syncState();
+        })()
+    """.trimIndent()
 }

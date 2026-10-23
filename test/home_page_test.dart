@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:get/get.dart';
+import 'package:web_scanner_pro/core/localization/app_translations.dart';
 import 'package:web_scanner_pro/core/theme/app_theme.dart';
 import 'package:web_scanner_pro/features/home/home_page.dart';
 import 'package:web_scanner_pro/features/sessions/web_session.dart';
@@ -9,8 +11,11 @@ void main() {
     WebSession? session,
     VoidCallback? onHowToUse,
     TextScaler textScaler = TextScaler.noScaling,
-  }) => MaterialApp(
+  }) => GetMaterialApp(
     theme: AppTheme.light,
+    translations: AppTranslations(),
+    locale: const Locale('en'),
+    fallbackLocale: const Locale('en'),
     builder: (context, child) => MediaQuery(
       data: MediaQuery.of(context).copyWith(textScaler: textScaler),
       child: child!,

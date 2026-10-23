@@ -1,0 +1,55 @@
+const viTranslations = <String, String>{
+  'choose_language': 'Chọn ngôn ngữ',
+  'done': 'Xong',
+  'settings': 'Cài đặt',
+  'language': 'Ngôn ngữ',
+  'replay_onboarding': 'Xem lại luồng giới thiệu',
+  'replay_onboarding_subtitle':
+      'Mở lại màn hình khởi động, chọn ngôn ngữ và hướng dẫn quyền.',
+  'privacy_note':
+      'Ứng dụng không có quảng cáo, phân tích hoặc máy chủ riêng. Nội dung Web kết nối tới WhatsApp; dữ liệu chỉ rời app khi bạn chủ động mở hoặc chia sẻ tệp.',
+  'version_title': 'Phiên bản base 0.1.0',
+  'version_description':
+      'Chỉ Android 10 trở lên. Phiên Web hỗ trợ camera, micro và gửi tài liệu, ảnh, video hoặc âm thanh.',
+  'account_management': 'Quản lý tài khoản',
+  'deleted_messages': 'Tin nhắn\nđã xóa',
+  'downloads': 'Tệp tải xuống',
+  'status_saver': 'Lưu trạng thái',
+  'direct_chat': 'Chat trực tiếp',
+  'how_to_use': 'Cách sử dụng',
+  'settings_tooltip': 'Cài đặt',
+  'clone_hint': 'Nhấn để nhân bản WA ngay',
+  'splash_tagline': 'Nhân bản tài khoản WA & Quản lý tin nhắn thông minh',
+  'initializing': 'Đang khởi tạo...',
+  'history': 'Thông báo đã lưu',
+  'files': 'Tệp đã lưu',
+  'generic_error': 'Không thể hoàn tất thao tác. Vui lòng thử lại.',
+};
+
+const enTranslations = <String, String>{
+  'choose_language': 'Choose language',
+  'done': 'Done',
+  'settings': 'Settings',
+  'language': 'Language',
+  'replay_onboarding': 'Replay onboarding',
+  'replay_onboarding_subtitle':
+      'Open the welcome flow, choose a language, and review permissions.',
+  'privacy_note':
+      'The app has no ads, analytics, or private backend. Web content connects to WhatsApp; data leaves the app only when you open or share a file.',
+  'version_title': 'Base version 0.1.0',
+  'version_description':
+      'Android 10 or later. Web sessions support camera, microphone, documents, photos, video, and audio.',
+  'account_management': 'Account Management',
+  'deleted_messages': 'Deleted\nMessages',
+  'downloads': 'Downloads',
+  'status_saver': 'Status Saver',
+  'direct_chat': 'Direct Chat',
+  'how_to_use': 'How To Use',
+  'settings_tooltip': 'Settings',
+  'clone_hint': 'Tap to clone WA now',
+  'splash_tagline': 'Clone WA accounts & manage messages intelligently',
+  'initializing': 'Initializing...',
+  'history': 'Saved notifications',
+  'files': 'Saved files',
+  'generic_error': 'Unable to complete the action. Please try again.',
+};

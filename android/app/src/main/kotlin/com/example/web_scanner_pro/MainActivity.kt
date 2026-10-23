@@ -12,9 +12,11 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private lateinit var media: MediaBridge
+    private var pendingRoute: String? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        pendingRoute = intent?.getStringExtra("open_route") ?: pendingRoute
         media = MediaBridge(this)
         val web = WebBridge(this)
         val history = HistoryBridge(this)
@@ -28,6 +30,10 @@ class MainActivity : FlutterActivity() {
                         "multiProfile" to WebBridge.supportsProfiles(),
                         "notificationAccess" to HistoryBridge.hasAccess(this)
                     ))
+                } else if (call.method == "consumePendingRoute") {
+                    val route = pendingRoute
+                    pendingRoute = null
+                    result.success(route)
                 } else if (!settings.handle(call, result) &&
                     !directChat.handle(call, result) && !web.handle(call, result) &&
                     !history.handle(call, result) && !media.handle(call, result)) {
@@ -36,6 +42,14 @@ class MainActivity : FlutterActivity() {
             } catch (_: Exception) {
                 result.error("platform_error", "Không thể hoàn tất thao tác. Hãy thử lại.", null)
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        intent.getStringExtra("open_route")?.takeIf { it.isNotBlank() }?.let {
+            pendingRoute = it
         }
     }
 

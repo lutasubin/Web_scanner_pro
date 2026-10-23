@@ -5,13 +5,33 @@ import android.service.notification.StatusBarNotification
 import java.security.MessageDigest
 
 object NotificationTextParser {
+    private val groupCountSuffix = Regex("""\s*\(\d+\s+(?:messages?|tin nhắn|mensajes?|messages)\)\s*:?\s*$""", RegexOption.IGNORE_CASE)
+
     fun parse(notification: StatusBarNotification): List<HistoryMessage> {
         val content = notification.notification
         if (content.flags and Notification.FLAG_GROUP_SUMMARY != 0) return emptyList()
-        val title = content.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
+        val rawTitle = content.extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString()
+            ?: content.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
+            .orEmpty()
+        val title = normalizeTitle(rawTitle)
         val body = (content.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
             ?: content.extras.getCharSequence(Notification.EXTRA_TEXT))?.toString().orEmpty()
         return listOfNotNull(create(notification, title, body, notification.postTime))
+    }
+
+    internal fun normalizeTitle(rawTitle: String): String {
+        val trimmed = rawTitle.trim()
+        if (trimmed.isEmpty()) return "WhatsApp"
+        // Strip group message count suffixes like "Nhóm ABC (3 tin nhắn): Lan" -> "Nhóm ABC: Lan" or "Nhóm ABC"
+        val colonIndex = trimmed.lastIndexOf(':')
+        if (colonIndex > 0) {
+            val prefix = trimmed.substring(0, colonIndex).replace(groupCountSuffix, "").trim()
+            val sender = trimmed.substring(colonIndex + 1).trim()
+            if (prefix.isNotEmpty() && sender.isNotEmpty()) {
+                return "$prefix · $sender"
+            }
+        }
+        return trimmed.replace(groupCountSuffix, "").trim().ifEmpty { "WhatsApp" }
     }
 
     private fun create(source: StatusBarNotification, title: String, body: String, time: Long): HistoryMessage? {

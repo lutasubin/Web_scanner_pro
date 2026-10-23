@@ -46,6 +46,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       activeSession: controller.activeSession,
       loading: controller.busy.value,
       error: controller.error.value,
+      showHandCoachmark: controller.showHandCoachmark.value,
+      onDismissHandCoachmark: controller.dismissHandCoachmark,
       onSettings: () => Get.toNamed<void>(AppRoutes.settings),
       onAccount: controller.openActive,
       onAccountManagement: _openAccounts,
@@ -74,6 +76,8 @@ class HomeDashboard extends StatelessWidget {
     required this.onStatusSaver,
     required this.onDirectChat,
     required this.onHowToUse,
+    this.showHandCoachmark = false,
+    this.onDismissHandCoachmark,
   });
 
   final WebSession? activeSession;
@@ -88,6 +92,8 @@ class HomeDashboard extends StatelessWidget {
   final VoidCallback onStatusSaver;
   final VoidCallback onDirectChat;
   final VoidCallback onHowToUse;
+  final bool showHandCoachmark;
+  final VoidCallback? onDismissHandCoachmark;
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -123,7 +129,11 @@ class HomeDashboard extends StatelessWidget {
                       _AccountManagementCard(onTap: onAccountManagement),
                       const SizedBox(height: 17),
                     ],
-                    _DualAppBanner(onTap: onDualApp),
+                    _DualAppBanner(
+                      onTap: onDualApp,
+                      showHandCoachmark: showHandCoachmark,
+                      onDismissHandCoachmark: onDismissHandCoachmark,
+                    ),
                     const SizedBox(height: 17),
                     GridView(
                       shrinkWrap: true,
@@ -139,31 +149,31 @@ class HomeDashboard extends StatelessWidget {
                         FeatureCard(
                           key: const Key('deleted-messages'),
                           icon: Icons.delete_outline_rounded,
-                          title: 'Deleted\nMessages',
+                          title: 'deleted_messages'.tr,
                           onTap: onDeletedMessages,
                         ),
                         FeatureCard(
                           key: const Key('downloads'),
                           icon: Icons.file_download_outlined,
-                          title: 'Downloads',
+                          title: 'downloads'.tr,
                           onTap: onDownloads,
                         ),
                         FeatureCard(
                           key: const Key('status-saver'),
                           icon: Icons.downloading_outlined,
-                          title: 'Status Saver',
+                          title: 'status_saver'.tr,
                           onTap: onStatusSaver,
                         ),
                         FeatureCard(
                           key: const Key('direct-chat'),
                           icon: Icons.chat_bubble_outline_rounded,
-                          title: 'Direct Chat',
+                          title: 'direct_chat'.tr,
                           onTap: onDirectChat,
                         ),
                         FeatureCard(
                           key: const Key('how-to-use'),
                           icon: Icons.help_outline_rounded,
-                          title: 'How To Use',
+                          title: 'how_to_use'.tr,
                           onTap: onHowToUse,
                         ),
                       ],
@@ -200,7 +210,7 @@ class _HomeHeader extends StatelessWidget {
         ),
         IconButton(
           key: const Key('settings'),
-          tooltip: 'Settings',
+          tooltip: 'settings_tooltip'.tr,
           onPressed: onSettings,
           icon: const Icon(Icons.settings_outlined, size: 25),
         ),
@@ -269,19 +279,22 @@ class _AccountManagementCard extends StatelessWidget {
         key: const Key('account-management'),
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,
-        child: const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 15),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 15),
           child: Row(
             children: [
-              Icon(Icons.group_outlined, size: 25),
-              SizedBox(width: 15),
+              const Icon(Icons.group_outlined, size: 25),
+              const SizedBox(width: 15),
               Expanded(
                 child: Text(
-                  'Account Management',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                  'account_management'.tr,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                  ),
                 ),
               ),
-              Icon(Icons.arrow_forward_rounded, size: 26),
+              const Icon(Icons.arrow_forward_rounded, size: 26),
             ],
           ),
         ),
@@ -290,97 +303,200 @@ class _AccountManagementCard extends StatelessWidget {
   );
 }
 
-class _DualAppBanner extends StatelessWidget {
-  const _DualAppBanner({required this.onTap});
+class _DualAppBanner extends StatefulWidget {
+  const _DualAppBanner({
+    required this.onTap,
+    this.showHandCoachmark = false,
+    this.onDismissHandCoachmark,
+  });
 
   final VoidCallback onTap;
+  final bool showHandCoachmark;
+  final VoidCallback? onDismissHandCoachmark;
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: const Color(0xFF08C567),
-    borderRadius: BorderRadius.circular(12),
-    clipBehavior: Clip.antiAlias,
-    child: InkWell(
-      key: const Key('dual-app'),
-      onTap: onTap,
-      child: SizedBox(
-        height: 94,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Expanded(
-                      child: Align(
-                        alignment: Alignment.bottomLeft,
-                        child: Text(
-                          'Dual App',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 21,
-                            fontWeight: FontWeight.w800,
-                            height: 1,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    Expanded(
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 28,
-                            height: 28,
-                            decoration: const BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.person_add_alt_1_rounded,
-                              color: Colors.black,
-                              size: 17,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          const Flexible(
+  State<_DualAppBanner> createState() => _DualAppBannerState();
+}
+
+class _DualAppBannerState extends State<_DualAppBanner>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulseCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _pulseCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Stack(
+    clipBehavior: Clip.none,
+    children: [
+      Material(
+        color: const Color(0xFF08C567),
+        borderRadius: BorderRadius.circular(12),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          key: const Key('dual-app'),
+          onTap: widget.onTap,
+          child: SizedBox(
+            height: 94,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Expanded(
+                          child: Align(
+                            alignment: Alignment.bottomLeft,
                             child: Text(
-                              'WA & Business',
+                              'Dual App',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 15,
+                                fontSize: 21,
+                                fontWeight: FontWeight.w800,
+                                height: 1,
                               ),
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(height: 5),
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 28,
+                                height: 28,
+                                decoration: const BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.person_add_alt_1_rounded,
+                                  color: Colors.black,
+                                  size: 17,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              const Flexible(
+                                child: Text(
+                                  'WA & Business',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                  const Icon(
+                    Icons.qr_code_2_rounded,
+                    color: Color(0xFF009C55),
+                    size: 72,
+                  ),
+                  const SizedBox(width: 13),
+                  const Icon(
+                    Icons.arrow_forward_rounded,
+                    color: Colors.white,
+                    size: 27,
+                  ),
+                ],
               ),
-              const Icon(
-                Icons.qr_code_2_rounded,
-                color: Color(0xFF009C55),
-                size: 72,
-              ),
-              const SizedBox(width: 13),
-              const Icon(
-                Icons.arrow_forward_rounded,
-                color: Colors.white,
-                size: 27,
-              ),
-            ],
+            ),
           ),
         ),
       ),
-    ),
+      if (widget.showHandCoachmark)
+        Positioned(
+          right: 12,
+          bottom: -18,
+          child: GestureDetector(
+            key: const Key('home-hand-coachmark'),
+            onTap: widget.onTap,
+            child: AnimatedBuilder(
+              animation: _pulseCtrl,
+              builder: (context, child) => Transform.translate(
+                offset: Offset(0, -6 * _pulseCtrl.value),
+                child: child,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1C1F1D),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x33000000),
+                          blurRadius: 8,
+                          offset: Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'clone_hint'.tr,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        if (widget.onDismissHandCoachmark != null) ...[
+                          const SizedBox(width: 6),
+                          InkWell(
+                            onTap: widget.onDismissHandCoachmark,
+                            child: const Icon(
+                              Icons.close_rounded,
+                              size: 15,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Image.asset(
+                    'assets/images/ic_hand.webp',
+                    width: 44,
+                    height: 44,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+    ],
   );
 }
 

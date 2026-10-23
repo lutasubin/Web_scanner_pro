@@ -1,0 +1,55 @@
+const frTranslations = <String, String>{
+  'choose_language': 'Choisir la langue',
+  'done': 'Terminé',
+  'settings': 'Paramètres',
+  'language': 'Langue',
+  'replay_onboarding': 'Revoir la présentation',
+  'replay_onboarding_subtitle':
+      'Rouvrez l’accueil, la langue et les autorisations.',
+  'privacy_note':
+      'L’application ne contient ni publicité, ni analyse, ni serveur privé. Les données ne sortent que lorsque vous ouvrez ou partagez un fichier.',
+  'version_title': 'Version de base 0.1.0',
+  'version_description':
+      'Android 10 ou version ultérieure. La session Web prend en charge caméra, micro et médias.',
+  'account_management': 'Gestion des comptes',
+  'deleted_messages': 'Messages\nsupprimés',
+  'downloads': 'Téléchargements',
+  'status_saver': 'Enregistrer les statuts',
+  'direct_chat': 'Discussion directe',
+  'how_to_use': 'Mode d’emploi',
+  'settings_tooltip': 'Paramètres',
+  'clone_hint': 'Touchez pour cloner WA',
+  'splash_tagline': 'Clonez des comptes WA et gérez les messages',
+  'initializing': 'Initialisation...',
+  'history': 'Notifications enregistrées',
+  'files': 'Fichiers enregistrés',
+  'generic_error': 'Action impossible. Réessayez.',
+};
+
+const deTranslations = <String, String>{
+  'choose_language': 'Sprache auswählen',
+  'done': 'Fertig',
+  'settings': 'Einstellungen',
+  'language': 'Sprache',
+  'replay_onboarding': 'Einführung wiederholen',
+  'replay_onboarding_subtitle':
+      'Start, Sprache und Berechtigungen erneut anzeigen.',
+  'privacy_note':
+      'Die App enthält keine Werbung, Analyse oder eigenen Server. Daten verlassen die App nur beim Öffnen oder Teilen einer Datei.',
+  'version_title': 'Basisversion 0.1.0',
+  'version_description':
+      'Android 10 oder neuer. Web-Sitzungen unterstützen Kamera, Mikrofon und Mediendateien.',
+  'account_management': 'Kontoverwaltung',
+  'deleted_messages': 'Gelöschte\nNachrichten',
+  'downloads': 'Downloads',
+  'status_saver': 'Status speichern',
+  'direct_chat': 'Direktchat',
+  'how_to_use': 'Anleitung',
+  'settings_tooltip': 'Einstellungen',
+  'clone_hint': 'Tippen, um WA zu klonen',
+  'splash_tagline': 'WA-Konten klonen und Nachrichten verwalten',
+  'initializing': 'Wird gestartet...',
+  'history': 'Gespeicherte Mitteilungen',
+  'files': 'Gespeicherte Dateien',
+  'generic_error': 'Aktion nicht möglich. Bitte erneut versuchen.',
+};

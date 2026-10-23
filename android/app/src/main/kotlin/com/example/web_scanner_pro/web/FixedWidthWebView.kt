@@ -4,9 +4,13 @@ import android.content.Context
 import android.webkit.WebView
 
 class FixedWidthWebView(context: Context) : WebView(context) {
-    override fun scrollTo(x: Int, y: Int) = super.scrollTo(0, y)
+    var allowHorizontalScroll: Boolean = false
 
-    override fun scrollBy(x: Int, y: Int) = super.scrollBy(0, y)
+    override fun scrollTo(x: Int, y: Int) =
+        super.scrollTo(if (allowHorizontalScroll) x else 0, y)
+
+    override fun scrollBy(x: Int, y: Int) =
+        super.scrollBy(if (allowHorizontalScroll) x else 0, y)
 
     override fun overScrollBy(
         deltaX: Int,
@@ -19,13 +23,13 @@ class FixedWidthWebView(context: Context) : WebView(context) {
         maxOverScrollY: Int,
         isTouchEvent: Boolean,
     ): Boolean = super.overScrollBy(
-        0,
+        if (allowHorizontalScroll) deltaX else 0,
         deltaY,
-        0,
+        if (allowHorizontalScroll) scrollX else 0,
         scrollY,
-        0,
+        if (allowHorizontalScroll) scrollRangeX else 0,
         scrollRangeY,
-        0,
+        if (allowHorizontalScroll) maxOverScrollX else 0,
         maxOverScrollY,
         isTouchEvent,
     )

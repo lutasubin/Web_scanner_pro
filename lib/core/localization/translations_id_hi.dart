@@ -1,0 +1,54 @@
+const idTranslations = <String, String>{
+  'choose_language': 'Pilih bahasa',
+  'done': 'Selesai',
+  'settings': 'Pengaturan',
+  'language': 'Bahasa',
+  'replay_onboarding': 'Ulangi pengenalan',
+  'replay_onboarding_subtitle':
+      'Buka kembali pengenalan, bahasa, dan panduan izin.',
+  'privacy_note':
+      'Aplikasi tidak memiliki iklan, analitik, atau server pribadi. Data hanya keluar saat Anda membuka atau membagikan file.',
+  'version_title': 'Versi dasar 0.1.0',
+  'version_description':
+      'Android 10 atau lebih baru. Sesi Web mendukung kamera, mikrofon, dan file media.',
+  'account_management': 'Kelola akun',
+  'deleted_messages': 'Pesan\ndihapus',
+  'downloads': 'Unduhan',
+  'status_saver': 'Simpan status',
+  'direct_chat': 'Chat langsung',
+  'how_to_use': 'Cara menggunakan',
+  'settings_tooltip': 'Pengaturan',
+  'clone_hint': 'Ketuk untuk menggandakan WA',
+  'splash_tagline': 'Gandakan akun WA dan kelola pesan',
+  'initializing': 'Memulai...',
+  'history': 'Notifikasi tersimpan',
+  'files': 'File tersimpan',
+  'generic_error': 'Tindakan gagal. Silakan coba lagi.',
+};
+
+const hiTranslations = <String, String>{
+  'choose_language': 'भाषा चुनें',
+  'done': 'पूर्ण',
+  'settings': 'सेटिंग्स',
+  'language': 'भाषा',
+  'replay_onboarding': 'परिचय फिर देखें',
+  'replay_onboarding_subtitle': 'स्वागत, भाषा और अनुमति निर्देश फिर से खोलें।',
+  'privacy_note':
+      'ऐप में विज्ञापन, एनालिटिक्स या निजी सर्वर नहीं है। डेटा केवल फ़ाइल खोलने या साझा करने पर बाहर जाता है।',
+  'version_title': 'बेस संस्करण 0.1.0',
+  'version_description':
+      'Android 10 या नया। वेब सत्र कैमरा, माइक्रोफ़ोन और मीडिया फ़ाइलों का समर्थन करता है।',
+  'account_management': 'खाता प्रबंधन',
+  'deleted_messages': 'हटाए गए\nसंदेश',
+  'downloads': 'डाउनलोड',
+  'status_saver': 'स्टेटस सेव करें',
+  'direct_chat': 'सीधी चैट',
+  'how_to_use': 'उपयोग कैसे करें',
+  'settings_tooltip': 'सेटिंग्स',
+  'clone_hint': 'WA क्लोन करने के लिए टैप करें',
+  'splash_tagline': 'WA खाते क्लोन करें और संदेश प्रबंधित करें',
+  'initializing': 'शुरू हो रहा है...',
+  'history': 'सहेजी गई सूचनाएँ',
+  'files': 'सहेजी गई फ़ाइलें',
+  'generic_error': 'कार्रवाई पूरी नहीं हुई। फिर कोशिश करें।',
+};

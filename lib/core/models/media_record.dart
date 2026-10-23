@@ -23,6 +23,8 @@ class MediaRecord {
 
   bool get isVideo => mimeType.startsWith('video/');
   bool get isImage => mimeType.startsWith('image/');
+  bool get isAudio => mimeType.startsWith('audio/');
+  bool get isDocument => !isVideo && !isImage && !isAudio;
   String get sizeLabel => size < 1024
       ? '$size B'
       : size < 1024 * 1024

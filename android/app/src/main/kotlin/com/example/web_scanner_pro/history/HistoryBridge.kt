@@ -13,10 +13,26 @@ class HistoryBridge(private val context: Context) {
 
     fun handle(call: MethodCall, result: MethodChannel.Result): Boolean {
         when (call.method) {
-            "listMessages", "clearMessages" -> HistoryDispatch.worker.execute {
+            "listMessages", "clearMessages", "deleteMessage", "deleteConversation" -> HistoryDispatch.worker.execute {
                 try {
-                    val value = if (call.method == "listMessages") store.list().map { it.asMap() }
-                    else { store.clear(); null }
+                    val value = when (call.method) {
+                        "listMessages" -> store.list().map { it.asMap() }
+                        "deleteMessage" -> {
+                            store.deleteMessage(call.argument<String>("id").orEmpty())
+                            null
+                        }
+                        "deleteConversation" -> {
+                            store.deleteConversation(
+                                call.argument<String>("title").orEmpty(),
+                                call.argument<String>("packageName").orEmpty(),
+                            )
+                            null
+                        }
+                        else -> {
+                            store.clear()
+                            null
+                        }
+                    }
                     HistoryDispatch.main.post { result.success(value) }
                 } catch (_: Exception) {
                     HistoryDispatch.main.post {

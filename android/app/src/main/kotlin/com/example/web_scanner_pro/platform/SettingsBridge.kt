@@ -12,6 +12,10 @@ class SettingsBridge(context: Context) {
             "getSettings" -> result.success(mapOf(
                 "theme" to preferences.getString("theme", "system"),
                 "onboardingDone" to preferences.getBoolean("onboardingDone", false),
+                "languageCode" to preferences.getString("languageCode", "vi"),
+                "showHomeHand" to preferences.getBoolean("showHomeHand", true),
+                "shownNotifyDialog" to preferences.getBoolean("shownNotifyDialog", false),
+                "shownStorageDialog" to preferences.getBoolean("shownStorageDialog", false),
                 "captureEnabled" to preferences.getBoolean("captureEnabled", false)
             ))
             "updateSettings" -> update(call, result)
@@ -29,6 +33,10 @@ class SettingsBridge(context: Context) {
         val editor = preferences.edit()
         theme?.let { editor.putString("theme", it) }
         call.argument<Boolean>("onboardingDone")?.let { editor.putBoolean("onboardingDone", it) }
+        call.argument<String>("languageCode")?.let { editor.putString("languageCode", it) }
+        call.argument<Boolean>("showHomeHand")?.let { editor.putBoolean("showHomeHand", it) }
+        call.argument<Boolean>("shownNotifyDialog")?.let { editor.putBoolean("shownNotifyDialog", it) }
+        call.argument<Boolean>("shownStorageDialog")?.let { editor.putBoolean("shownStorageDialog", it) }
         call.argument<Boolean>("captureEnabled")?.let { editor.putBoolean("captureEnabled", it) }
         if (editor.commit()) result.success(null)
         else result.error("settings_failed", "Không lưu được cài đặt.", null)

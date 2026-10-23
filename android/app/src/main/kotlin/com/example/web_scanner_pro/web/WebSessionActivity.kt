@@ -2,29 +2,36 @@ package com.example.web_scanner_pro.web
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.ActivityNotFoundException
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
-import android.app.DownloadManager
 import android.content.pm.PackageManager
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.graphics.Color
 import android.provider.MediaStore
+import android.text.InputFilter
+import android.text.InputType
 import android.util.Log
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
+import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebView
-import android.app.AlertDialog
-import android.text.InputFilter
-import android.text.InputType
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -34,27 +41,44 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
+import com.example.web_scanner_pro.MainActivity
 import com.example.web_scanner_pro.R
 import java.io.File
 
 class WebSessionActivity : ComponentActivity() {
     var sessionId: String = "personal"
         private set
-    private var webView: WebView? = null
+    private var webView: FixedWidthWebView? = null
     private lateinit var session: StoredWebSession
+    private lateinit var toolbar: WebSessionToolbar
     private lateinit var message: TextView
     private lateinit var progress: ProgressBar
-    private lateinit var qrOverlay: QrLoginOverlay
-    private lateinit var phoneOverlay: PhoneLoginOverlay
+    private lateinit var preLoginModeCard: LinearLayout
+    private lateinit var preLoginModeIcon: ImageView
+    private lateinit var preLoginModeLabel: TextView
+    private lateinit var preLoginFab: LinearLayout
+    private lateinit var preLoginFabIcon: ImageView
+    private lateinit var preLoginFabLabel: TextView
+    private lateinit var keyboardHintCard: LinearLayout
     private lateinit var downloadHandler: WebDownloadHandler
     private val handler = Handler(Looper.getMainLooper())
     private var readyChecks = 0
+    private var isLoggedIn = false
+    private var currentLoginMode = WebMobileLayout.MODE_QR
+    private var webMode = 0 // 0 = Advanced Mobile (1-pane), 1 = Basic Desktop
+    private var isKeyboardLocked = false
+    private var isDarkMode = false
+    private var openedQrHelperThisSession = false
+    private var openedCodeHelperThisSession = false
     private var pendingMediaRequest: PermissionRequest? = null
     private var pendingMediaResources: Array<String> = emptyArray()
     private var pendingFileCallback: ValueCallback<Array<Uri>>? = null
     private var pendingCapture: Pair<Uri, File>? = null
     private var pendingFileParams: WebChromeClient.FileChooserParams? = null
+
     private val mediaPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) {
@@ -72,6 +96,7 @@ class WebSessionActivity : ComponentActivity() {
             ).show()
         }
     }
+
     private val fileChooserLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) { result ->
@@ -88,6 +113,7 @@ class WebSessionActivity : ComponentActivity() {
             ) { state -> Log.i(FILE_CHOOSER_LOG, "inputs=$state") }
         }, 1200)
     }
+
     private val fileCapturePermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { granted ->
@@ -112,93 +138,520 @@ class WebSessionActivity : ComponentActivity() {
         sessionId = intent.getStringExtra("id") ?: "personal"
         session = WebSessionStore(this).find(sessionId) ?: run { finish(); return }
         if (SessionProfiles.isResetting(sessionId) ||
-            (sessionId != WebSessionStore.DEFAULT_ID && !WebBridge.supportsProfiles())) { finish(); return }
+            (sessionId != WebSessionStore.DEFAULT_ID && !WebBridge.supportsProfiles())
+        ) {
+            finish()
+            return
+        }
+        val prefs = prefs()
+        webMode = prefs.getInt("web_mode_$sessionId", 0)
+        isDarkMode = prefs.getBoolean("dark_mode_$sessionId", false)
+        isKeyboardLocked = prefs.getBoolean("kb_lock_$sessionId", false)
         try {
             window.statusBarColor = Color.WHITE
             window.navigationBarColor = Color.WHITE
             window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
-            val view = FixedWidthWebView(this)
+            val view = FixedWidthWebView(this).apply {
+                allowHorizontalScroll = (webMode == 1)
+            }
             webView = view
-            if (WebBridge.supportsProfiles()) WebViewCompat.setProfile(view, SessionProfiles.name(sessionId))
+            if (WebBridge.supportsProfiles()) {
+                WebViewCompat.setProfile(view, SessionProfiles.name(sessionId))
+            }
             downloadHandler = WebDownloadHandler(applicationContext, ::showMessage)
             downloadHandler.attach(view)
+            view.addJavascriptInterface(AndroidJsBridge(), "Android")
             buildLayout(view)
-            SessionWebConfiguration.configure(view, this, ::showMessage,
-                ::showProgress, ::waitForWebContent, ::handleMediaPermission,
-                ::cancelMediaPermission, ::showFileChooser, downloadHandler::download)
+            SessionWebConfiguration.configure(
+                view,
+                this,
+                ::showMessage,
+                ::showProgress,
+                ::waitForWebContent,
+                ::handleMediaPermission,
+                ::cancelMediaPermission,
+                ::showFileChooser,
+                downloadHandler::download,
+            )
+            applyWebDisplaySettings(view)
+            applyDarkMode(view)
             SessionProfiles.register(this)
-            onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
-                override fun handleOnBackPressed() {
-                    handleWebBack(view)
-                }
-            })
+            onBackPressedDispatcher.addCallback(
+                this,
+                object : OnBackPressedCallback(true) {
+                    override fun handleOnBackPressed() {
+                        handleWebBack(view)
+                    }
+                },
+            )
             view.loadUrl("https://web.whatsapp.com/")
         } catch (_: Exception) {
-            Toast.makeText(this, "Không mở được WebView. Hãy cập nhật và thử lại.", Toast.LENGTH_LONG).show()
+            Toast.makeText(
+                this,
+                "Không mở được WebView. Hãy cập nhật và thử lại.",
+                Toast.LENGTH_LONG,
+            ).show()
             finish()
         }
     }
 
-    private fun buildLayout(view: WebView) {
+    private fun buildLayout(view: FixedWidthWebView) {
+        val density = resources.displayMetrics.density
+        fun dp(v: Int) = (v * density).toInt()
+
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         root.setOnApplyWindowInsetsListener { target, insets ->
-            target.setPadding(insets.systemWindowInsetLeft, insets.systemWindowInsetTop,
-                insets.systemWindowInsetRight, insets.systemWindowInsetBottom)
+            target.setPadding(
+                insets.systemWindowInsetLeft,
+                insets.systemWindowInsetTop,
+                insets.systemWindowInsetRight,
+                insets.systemWindowInsetBottom,
+            )
             insets
         }
         val sessions = WebSessionStore(this).list()
-        root.addView(WebSessionToolbar(
-            this, sessions, sessionId,
+        toolbar = WebSessionToolbar(
+            activity = this,
+            sessions = sessions,
+            currentId = sessionId,
             onClose = { handleWebBack(view) },
             onSelect = ::switchSession,
             onAdd = ::showCreateAccount,
-            onReload = { view.reload() },
-            onKeyboard = { showKeyboard(view) },
+            onReload = {
+                readyChecks = 0
+                view.reload()
+            },
+            onKeyboardToggle = { toggleKeyboardLock(view) },
             onDownloads = ::openDownloads,
-            onHelp = ::showHelp,
-        ).build())
+            onHelp = { showHelp(currentLoginMode) },
+            onSwitchLoginMode = { anchor ->
+                WebHelpDialogs.showLoginModePopup(this, anchor, currentLoginMode) { selected ->
+                    if (selected != currentLoginMode) {
+                        toggleLoginModeOnWeb(view, selected)
+                    }
+                }
+            },
+            onShowModeDialog = {
+                WebHelpDialogs.showDisplayModeDialog(this, webMode) { selectedMode ->
+                    setWebDisplayMode(view, selectedMode)
+                }
+            },
+            onToggleDarkMode = {
+                isDarkMode = !isDarkMode
+                prefs().edit().putBoolean("dark_mode_$sessionId", isDarkMode).apply()
+                applyDarkMode(view)
+            },
+        )
+        root.addView(toolbar.build())
+        toolbar.setKeyboardLocked(isKeyboardLocked)
+        toolbar.setDarkMode(isDarkMode)
+
         message = TextView(this).apply {
-            setPadding(16, 8, 16, 8)
+            setPadding(dp(16), dp(8), dp(16), dp(8))
             setBackgroundColor(0xFFFFF8E7.toInt())
+            setTextColor(0xFF202124.toInt())
+            textSize = 13.5f
             visibility = View.GONE
+            setOnClickListener { visibility = View.GONE }
         }
         root.addView(message)
+
         progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
             max = 100
             isIndeterminate = true
             contentDescription = getString(R.string.loading_whatsapp)
         }
-        root.addView(progress, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
-            resources.getDimensionPixelSize(R.dimen.web_progress_height)))
-        qrOverlay = QrLoginOverlay(this, ::showHelp) { showPhoneLogin(view) }
-        phoneOverlay = PhoneLoginOverlay(
-            this,
-            onContinue = { submitPhoneNumber(view, it) },
-            onQrLogin = { showQrLogin(view) },
-            onHelp = ::showHelp,
-        ).apply { visibility = View.GONE }
+        root.addView(
+            progress,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                resources.getDimensionPixelSize(R.dimen.web_progress_height),
+            ),
+        )
+
+        // Top floating login mode switcher pill (matches original app's pre-login mode indicator)
+        preLoginModeIcon = ImageView(this).apply {
+            setImageResource(R.drawable.ic_login_qr)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+        }
+        preLoginModeLabel = TextView(this).apply {
+            text = "Đang dùng: Mã QR  ▼"
+            textSize = 13.5f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(0xFF1F2A24.toInt())
+            setPadding(dp(8), 0, dp(4), 0)
+        }
+        preLoginModeCard = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            background = GradientDrawable().apply {
+                setColor(Color.WHITE)
+                cornerRadius = dp(20).toFloat()
+                setStroke(dp(1), 0xFFDADCE0.toInt())
+            }
+            elevation = dp(4).toFloat()
+            setPadding(dp(12), dp(8), dp(12), dp(8))
+            addView(preLoginModeIcon, LinearLayout.LayoutParams(dp(18), dp(18)))
+            addView(preLoginModeLabel)
+            setOnClickListener { anchor ->
+                WebHelpDialogs.showLoginModePopup(this@WebSessionActivity, anchor, currentLoginMode) { selected ->
+                    if (selected != currentLoginMode) {
+                        toggleLoginModeOnWeb(view, selected)
+                    }
+                }
+            }
+        }
+
+        // Bottom-right floating quick-switch button (matches original app's ivSwitchLoginMode + helper pill)
+        preLoginFabIcon = ImageView(this).apply {
+            setImageResource(R.drawable.ic_login_code)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+        }
+        preLoginFabLabel = TextView(this).apply {
+            text = "Đăng nhập bằng SĐT"
+            textSize = 13.5f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.WHITE)
+            setPadding(dp(8), 0, dp(4), 0)
+        }
+        preLoginFab = LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            background = GradientDrawable().apply {
+                setColor(0xFF00A884.toInt())
+                cornerRadius = dp(24).toFloat()
+            }
+            elevation = dp(6).toFloat()
+            setPadding(dp(14), dp(10), dp(14), dp(10))
+            addView(preLoginFabIcon, LinearLayout.LayoutParams(dp(22), dp(22)))
+            addView(preLoginFabLabel)
+            setOnClickListener {
+                val targetMode = if (currentLoginMode == WebMobileLayout.MODE_QR) {
+                    WebMobileLayout.MODE_CODE
+                } else {
+                    WebMobileLayout.MODE_QR
+                }
+                toggleLoginModeOnWeb(view, targetMode)
+            }
+        }
+
+        // Top floating Keyboard Lock hint card (matches `popup_hint_keybroad.xml` in original app)
+        keyboardHintCard = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            visibility = View.GONE
+            background = GradientDrawable().apply {
+                setColor(0xFF1F2C34.toInt())
+                cornerRadius = dp(12).toFloat()
+            }
+            elevation = dp(6).toFloat()
+            setPadding(dp(14), dp(10), dp(14), dp(10))
+            addView(
+                ImageView(this@WebSessionActivity).apply {
+                    setImageResource(R.drawable.ic_web_keyboard_lock)
+                    imageTintList = android.content.res.ColorStateList.valueOf(Color.WHITE)
+                },
+                LinearLayout.LayoutParams(dp(20), dp(20)),
+            )
+            addView(
+                TextView(this@WebSessionActivity).apply {
+                    text = "Bàn phím đang khóa để tránh nhảy phím. Nhấn để mở khóa."
+                    textSize = 13f
+                    setTextColor(Color.WHITE)
+                },
+                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                    marginStart = dp(10)
+                },
+            )
+            addView(
+                TextView(this@WebSessionActivity).apply {
+                    text = "Mở khóa"
+                    textSize = 13f
+                    typeface = Typeface.DEFAULT_BOLD
+                    setTextColor(0xFF08C567.toInt())
+                    setPadding(dp(8), dp(4), dp(4), dp(4))
+                },
+            )
+            setOnClickListener {
+                if (isKeyboardLocked) {
+                    toggleKeyboardLock(view)
+                } else {
+                    visibility = View.GONE
+                }
+            }
+        }
+
         val content = FrameLayout(this).apply {
-            addView(view, FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-            addView(qrOverlay, FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
-            addView(phoneOverlay, FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+            addView(
+                view,
+                FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                ),
+            )
+            addView(
+                preLoginModeCard,
+                FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    Gravity.TOP or Gravity.END,
+                ).apply {
+                    topMargin = dp(10)
+                    marginEnd = dp(12)
+                },
+            )
+            addView(
+                preLoginFab,
+                FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    Gravity.BOTTOM or Gravity.END,
+                ).apply {
+                    bottomMargin = dp(18)
+                    marginEnd = dp(16)
+                },
+            )
+            addView(
+                keyboardHintCard,
+                FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    Gravity.TOP,
+                ).apply {
+                    topMargin = dp(8)
+                    marginStart = dp(12)
+                    marginEnd = dp(12)
+                },
+            )
         }
         root.addView(content, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         setContentView(root)
-        view.isHorizontalScrollBarEnabled = false
         view.overScrollMode = View.OVER_SCROLL_NEVER
+        updateLoginModeViews()
+    }
+
+    private fun updateLoginModeViews() {
+        if (!::preLoginModeCard.isInitialized) return
+        if (isLoggedIn) {
+            preLoginModeCard.visibility = View.GONE
+            preLoginFab.visibility = View.GONE
+            return
+        }
+        preLoginModeCard.visibility = View.VISIBLE
+        preLoginFab.visibility = View.VISIBLE
+        val isQr = currentLoginMode == WebMobileLayout.MODE_QR
+        preLoginModeIcon.setImageResource(
+            if (isQr) R.drawable.ic_login_qr else R.drawable.ic_login_code,
+        )
+        preLoginModeLabel.text = if (isQr) "Chế độ: Mã QR  ▼" else "Chế độ: Số điện thoại  ▼"
+        preLoginFabIcon.setImageResource(
+            if (isQr) R.drawable.ic_login_code else R.drawable.ic_login_qr,
+        )
+        preLoginFabLabel.text = if (isQr) "Đăng nhập bằng SĐT" else "Đăng nhập bằng Mã QR"
+    }
+
+    private fun toggleLoginModeOnWeb(view: WebView, targetMode: String) {
+        currentLoginMode = targetMode
+        updateLoginModeViews()
+        view.evaluateJavascript(WebMobileLayout.TOGGLE_LOGIN_MODE_SCRIPT) { result ->
+            handler.postDelayed({ syncObserverAndLayout(view) }, 350)
+            if (result == "\"not-found\"") {
+                Toast.makeText(
+                    this,
+                    "Đang tải trang đăng nhập WhatsApp Web, vui lòng đợi giây lát...",
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
+        }
+    }
+
+    private fun toggleKeyboardLock(view: WebView) {
+        isKeyboardLocked = !isKeyboardLocked
+        prefs().edit().putBoolean("kb_lock_$sessionId", isKeyboardLocked).apply()
+        toolbar.setKeyboardLocked(isKeyboardLocked)
+        view.evaluateJavascript(
+            "window.__webScannerKeyboardLocked = $isKeyboardLocked;",
+            null,
+        )
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+        if (isKeyboardLocked) {
+            imm.hideSoftInputFromWindow(view.windowToken, 0)
+            showKeyboardHintBriefly()
+        } else {
+            keyboardHintCard.visibility = View.GONE
+            view.requestFocus()
+            imm.showSoftInput(view, InputMethodManager.SHOW_IMPLICIT)
+            Toast.makeText(this, "Đã mở khóa bàn phím.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun showKeyboardHintBriefly() {
+        keyboardHintCard.visibility = View.VISIBLE
+        handler.removeCallbacks(hideKeyboardHintRunnable)
+        handler.postDelayed(hideKeyboardHintRunnable, 4500L)
+    }
+
+    private val hideKeyboardHintRunnable = Runnable {
+        if (::keyboardHintCard.isInitialized) {
+            keyboardHintCard.visibility = View.GONE
+        }
+    }
+
+    private fun setWebDisplayMode(view: FixedWidthWebView, newMode: Int) {
+        webMode = newMode
+        prefs().edit().putInt("web_mode_$sessionId", webMode).apply()
+        applyWebDisplaySettings(view)
+        syncObserverAndLayout(view)
+        Toast.makeText(
+            this,
+            if (webMode == 0) "Đã chuyển sang Chế độ nâng cao (Mobile)."
+            else "Đã chuyển sang Chế độ cơ bản (Desktop).",
+            Toast.LENGTH_SHORT,
+        ).show()
+    }
+
+    private fun applyWebDisplaySettings(view: FixedWidthWebView) {
+        val isBasicDesktop = (webMode == 1)
+        view.allowHorizontalScroll = isBasicDesktop
+        view.isHorizontalScrollBarEnabled = isBasicDesktop
+        view.settings.apply {
+            setSupportZoom(isBasicDesktop)
+            builtInZoomControls = isBasicDesktop
+            displayZoomControls = false
+        }
+    }
+
+    private fun applyDarkMode(view: WebView) {
+        toolbar.setDarkMode(isDarkMode)
+        window.statusBarColor = if (isDarkMode) 0xFF1F2C34.toInt() else Color.WHITE
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.ALGORITHMIC_DARKENING)) {
+            try {
+                WebSettingsCompat.setAlgorithmicDarkeningAllowed(view.settings, isDarkMode)
+            } catch (_: Exception) {}
+        }
+        view.evaluateJavascript(
+            "(function(){if(document.body){document.body.classList.toggle('dark',$isDarkMode);}})()",
+            null,
+        )
     }
 
     private fun installMobileLayout(view: WebView) {
-        val widthDp = view.width / resources.displayMetrics.density
-        // Giữ chữ và hàng chat ở kích thước mobile dễ đọc thay vì thu nhỏ cả
-        // trang desktop. Phần chiều rộng mở rộng bù lại mức zoom để không tạo
-        // cuộn ngang.
+        if (webMode == 1) {
+            view.evaluateJavascript(
+                WebMobileLayout.installDualAppObserver(webMode, isKeyboardLocked),
+                null,
+            )
+            return
+        }
+        val widthDp = (view.width.takeIf { it > 0 } ?: resources.displayMetrics.widthPixels) /
+            resources.displayMetrics.density
         val scale = (widthDp / 360f).coerceIn(0.9f, 1.18f)
         val expandedWidth = 100f / scale
         view.evaluateJavascript(WebMobileLayout.install(scale, expandedWidth), null)
+        view.evaluateJavascript(
+            WebMobileLayout.installDualAppObserver(webMode, isKeyboardLocked),
+            null,
+        )
+    }
+
+    private fun syncObserverAndLayout(view: WebView) {
+        view.evaluateJavascript(
+            WebMobileLayout.installDualAppObserver(webMode, isKeyboardLocked),
+        ) { state ->
+            if (state == "\"chat\"") {
+                onLoggedInDetected(view)
+            }
+        }
+    }
+
+    private fun onLoggedInDetected(view: WebView) {
+        if (!isLoggedIn) {
+            isLoggedIn = true
+            toolbar.setLoggedIn(true)
+            updateLoginModeViews()
+            val prefs = prefs()
+            if (!prefs.getBoolean("shown_first_login_security_dialog", false)) {
+                prefs.edit().putBoolean("shown_first_login_security_dialog", true).apply()
+                WebHelpDialogs.showFirstLoginSecurityDialog(this)
+            }
+        }
+        installMobileLayout(view)
+        applyDarkMode(view)
+        progress.visibility = View.GONE
+        message.visibility = View.GONE
+    }
+
+    private inner class AndroidJsBridge {
+        @JavascriptInterface
+        fun postMessage(event: String?) {
+            val ev = event ?: return
+            handler.post {
+                val view = webView ?: return@post
+                when (ev) {
+                    WebMobileLayout.MODE_QR -> {
+                        currentLoginMode = WebMobileLayout.MODE_QR
+                        if (isLoggedIn) {
+                            isLoggedIn = false
+                            toolbar.setLoggedIn(false)
+                        }
+                        updateLoginModeViews()
+                    }
+                    WebMobileLayout.MODE_CODE -> {
+                        currentLoginMode = WebMobileLayout.MODE_CODE
+                        if (isLoggedIn) {
+                            isLoggedIn = false
+                            toolbar.setLoggedIn(false)
+                        }
+                        updateLoginModeViews()
+                    }
+                    "openHelper" -> {
+                        if (!openedQrHelperThisSession &&
+                            !prefs().getBoolean("auto_shown_qr_helper", false)
+                        ) {
+                            openedQrHelperThisSession = true
+                            prefs().edit().putBoolean("auto_shown_qr_helper", true).apply()
+                            showHelp(WebMobileLayout.MODE_QR)
+                        }
+                    }
+                    "openCodeHelper" -> {
+                        if (!openedCodeHelperThisSession) {
+                            openedCodeHelperThisSession = true
+                            showHelp(WebMobileLayout.MODE_CODE)
+                        }
+                    }
+                    "logSuccess" -> {
+                        onLoggedInDetected(view)
+                    }
+                    "entryMessageDetail" -> {
+                        // Keep top toolbar back button accessible; in detail mode it navigates back to chat list
+                        toolbar.setBackVisible(true)
+                    }
+                    "leaveMessageDetail" -> {
+                        toolbar.setBackVisible(true)
+                    }
+                    "openKeyBroad" -> {
+                        if (isKeyboardLocked) {
+                            showKeyboardHintBriefly()
+                        }
+                    }
+                }
+            }
+        }
+
+        @JavascriptInterface
+        fun copyCode(code: String?) {
+            val clean = code?.trim().orEmpty()
+            if (clean.isEmpty()) return
+            handler.post {
+                try {
+                    val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("WhatsApp Link Code", clean))
+                    Toast.makeText(
+                        this@WebSessionActivity,
+                        "Đã tự động sao chép mã liên kết: $clean",
+                        Toast.LENGTH_LONG,
+                    ).show()
+                } catch (_: Exception) {}
+            }
+        }
     }
 
     private fun handleMediaPermission(request: PermissionRequest) {
@@ -335,10 +788,6 @@ class WebSessionActivity : ComponentActivity() {
                 .getOrDefault(false)
         }
         Log.i(FILE_CHOOSER_LOG, "verifiedUris=$uris")
-        // Return the picker-owned content URIs exactly as Android supplied
-        // them. Copying them through FileProvider loses the original display
-        // name/type on some photo pickers, so Chromium cannot construct the
-        // browser File expected by WhatsApp's attachment editor.
         return uris.toTypedArray().takeIf { it.isNotEmpty() }
     }
 
@@ -399,57 +848,6 @@ class WebSessionActivity : ComponentActivity() {
         message.visibility = View.VISIBLE
     }
 
-    private fun showPhoneLogin(view: WebView) {
-        val script = "(function(){var items=Array.from(document.querySelectorAll(" +
-            "'button,a,[role=button]'));var item=items.find(function(e){var t=(e.innerText||'').toLowerCase();" +
-            "return t.includes('phone number')||t.includes('số điện thoại');});" +
-            "if(item){item.click();return true;}return false;})()"
-        view.evaluateJavascript(script) { clicked ->
-            if (clicked == "true") {
-                qrOverlay.visibility = View.GONE
-                phoneOverlay.visibility = View.VISIBLE
-                phoneOverlay.prepareForDisplay()
-            } else Toast.makeText(this, "Chưa mở được đăng nhập bằng số điện thoại.", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    private fun showQrLogin(view: WebView) {
-        val script = "(function(){var items=Array.from(document.querySelectorAll(" +
-            "'button,a,[role=button]'));var item=items.find(function(e){var t=(e.innerText||'').toLowerCase();" +
-            "return t.includes('qr code')||t.includes('mã qr');});" +
-            "if(item){item.click();return true;}return false;})()"
-        view.evaluateJavascript(script) {
-            phoneOverlay.visibility = View.GONE
-            qrOverlay.showLoading()
-            readyChecks = 0
-            handler.postDelayed(::checkWebContent, 350)
-        }
-    }
-
-    private fun submitPhoneNumber(view: WebView, phone: String) {
-        val safePhone = phone.replace("'", "")
-        val script = "(function(){" +
-            "var input=document.querySelector(\"input[type='tel']\")||" +
-            "Array.from(document.querySelectorAll('input')).find(function(e){" +
-            "return (e.getAttribute('aria-label')||e.placeholder||'').toLowerCase().includes('phone');});" +
-            "if(!input)return 'input-missing';" +
-            "var setter=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;" +
-            "setter.call(input,'$safePhone');input.dispatchEvent(new Event('input',{bubbles:true}));" +
-            "input.dispatchEvent(new Event('change',{bubbles:true}));" +
-            "var buttons=Array.from(document.querySelectorAll('button,[role=button]'));" +
-            "var next=buttons.find(function(e){var t=(e.innerText||'').trim().toLowerCase();" +
-            "return t==='next'||t==='tiếp tục'||t==='continue';});" +
-            "if(next){next.click();return 'submitted';}return 'button-missing';})()"
-        view.evaluateJavascript(script) { result ->
-            if (result == "\"submitted\"") {
-                phoneOverlay.visibility = View.GONE
-                installMobileLayout(view)
-            } else {
-                Toast.makeText(this, "Chưa gửi được số điện thoại. Vui lòng thử lại.", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
     private fun switchSession(id: String) {
         if (id == sessionId) return
         WebSessionStore(this).select(id)
@@ -459,18 +857,29 @@ class WebSessionActivity : ComponentActivity() {
 
     private fun showCreateAccount() {
         if (!WebBridge.supportsProfiles()) {
-            Toast.makeText(this, "Cập nhật Android System WebView để thêm tài khoản.", Toast.LENGTH_LONG).show()
+            Toast.makeText(
+                this,
+                "Cập nhật Android System WebView để thêm tài khoản.",
+                Toast.LENGTH_LONG,
+            ).show()
+            return
+        }
+        val sessions = WebSessionStore(this).list()
+        if (sessions.size >= 5) {
+            Toast.makeText(this, "Hỗ trợ tối đa 5 tài khoản song song.", Toast.LENGTH_SHORT).show()
             return
         }
         val input = EditText(this).apply {
             hint = "Ví dụ: Bán hàng"
+            setText("Tài khoản ${sessions.size + 1}")
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
             filters = arrayOf(InputFilter.LengthFilter(40))
             setSingleLine(true)
+            selectAll()
         }
         val dialog = AlertDialog.Builder(this)
             .setTitle("Thêm tài khoản")
-            .setMessage("Tài khoản mới sẽ có mã QR và dữ liệu đăng nhập riêng.")
+            .setMessage("Tài khoản mới sẽ có mã QR và dữ liệu đăng nhập riêng biệt.")
             .setView(input)
             .setNegativeButton("Hủy", null)
             .setPositiveButton("Tạo", null)
@@ -478,13 +887,16 @@ class WebSessionActivity : ComponentActivity() {
         dialog.setOnShowListener {
             dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
                 val name = input.text.toString().trim()
-                if (name.isEmpty()) input.error = "Nhập tên tài khoản"
-                else try {
-                    val created = WebSessionStore(this).create(name)
-                    dialog.dismiss()
-                    switchSession(created.id)
-                } catch (_: Exception) {
-                    input.error = "Chưa tạo được tài khoản"
+                if (name.isEmpty()) {
+                    input.error = "Nhập tên tài khoản"
+                } else {
+                    try {
+                        val created = WebSessionStore(this).create(name)
+                        dialog.dismiss()
+                        switchSession(created.id)
+                    } catch (_: Exception) {
+                        input.error = "Chưa tạo được tài khoản"
+                    }
                 }
             }
             input.requestFocus()
@@ -492,27 +904,32 @@ class WebSessionActivity : ComponentActivity() {
         dialog.show()
     }
 
-    private fun showHelp() {
-        AlertDialog.Builder(this)
-            .setTitle("Liên kết WhatsApp")
-            .setMessage("Mở WhatsApp trên điện thoại chính → Thiết bị liên kết → Liên kết thiết bị, rồi quét mã QR trên màn hình này.")
-            .setPositiveButton("Đã hiểu", null)
-            .show()
-    }
-
-    private fun showKeyboard(view: WebView) {
-        view.requestFocus()
-        val keyboard = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
-        if (!keyboard.showSoftInput(view, InputMethodManager.SHOW_IMPLICIT)) {
-            Toast.makeText(this, "Chạm vào ô nhập tin nhắn để mở bàn phím.", Toast.LENGTH_SHORT).show()
-        }
+    private fun showHelp(mode: String = currentLoginMode) {
+        val view = webView
+        WebHelpDialogs.showHelpSheet(
+            activity = this,
+            initialMode = mode,
+            onSwitchLoginMode = { selected ->
+                if (view != null && selected != currentLoginMode) {
+                    toggleLoginModeOnWeb(view, selected)
+                }
+            },
+        )
     }
 
     private fun openDownloads() {
         try {
-            startActivity(Intent(DownloadManager.ACTION_VIEW_DOWNLOADS))
+            val intent = Intent(this, MainActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                putExtra("open_route", "/files")
+            }
+            startActivity(intent)
         } catch (_: Exception) {
-            Toast.makeText(this, "Không mở được thư mục Tải xuống trên thiết bị này.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(
+                this,
+                "Không mở được màn hình Tệp tải xuống.",
+                Toast.LENGTH_SHORT,
+            ).show()
         }
     }
 
@@ -529,40 +946,43 @@ class WebSessionActivity : ComponentActivity() {
     private fun waitForWebContent() {
         webView?.let(SessionWebConfiguration::flushCookies)
         readyChecks = 0
-        qrOverlay.showLoading()
         checkWebContent()
     }
 
     private fun checkWebContent() {
         val view = webView ?: return
-        val script = "(function(){if(document.querySelector(" +
-            "\"#pane-side,[data-testid='chat-list']\"))return 'chat';" +
-            "if(document.querySelector(\"[data-testid='qrcode'],canvas\"))return 'qr';" +
-            "return 'loading';})()"
-        view.evaluateJavascript(script) { state ->
-            if (state == "\"chat\"") {
-                installMobileLayout(view)
-                qrOverlay.visibility = View.GONE
-                phoneOverlay.visibility = View.GONE
-                progress.visibility = View.GONE
-                message.visibility = View.GONE
-            } else if (state == "\"qr\"") {
-                view.evaluateJavascript(WebQrCodeReader.SCRIPT) { encoded ->
-                    WebQrCodeReader.decode(encoded)?.let(qrOverlay::showQr)
+        view.evaluateJavascript(
+            WebMobileLayout.installDualAppObserver(webMode, isKeyboardLocked),
+        ) { state ->
+            when (state) {
+                "\"chat\"" -> {
+                    onLoggedInDetected(view)
                 }
-                progress.visibility = View.GONE
-                message.visibility = View.GONE
-                handler.postDelayed(::checkWebContent, 1000)
-            } else if (++readyChecks < 80) {
-                handler.postDelayed(::checkWebContent, 500)
-            } else {
-                progress.visibility = View.GONE
-                showMessage(getString(R.string.web_slow_hint))
+                "\"login\"" -> {
+                    progress.visibility = View.GONE
+                    message.visibility = View.GONE
+                    if (++readyChecks < 120) {
+                        handler.postDelayed(::checkWebContent, 1000)
+                    }
+                }
+                else -> {
+                    if (++readyChecks < 80) {
+                        handler.postDelayed(::checkWebContent, 500)
+                    } else {
+                        progress.visibility = View.GONE
+                        showMessage(getString(R.string.web_slow_hint))
+                    }
+                }
             }
         }
     }
 
-    fun closeSession() { disposeWebView(); finish() }
+    private fun prefs() = getSharedPreferences("web_session_ui_prefs", Context.MODE_PRIVATE)
+
+    fun closeSession() {
+        disposeWebView()
+        finish()
+    }
 
     private fun disposeWebView() {
         handler.removeCallbacksAndMessages(null)
@@ -572,6 +992,7 @@ class WebSessionActivity : ComponentActivity() {
         clearPendingFileRequest()
         webView?.let { view ->
             if (::downloadHandler.isInitialized) downloadHandler.detach(view)
+            view.removeJavascriptInterface("Android")
             (view.parent as? ViewGroup)?.removeView(view)
             view.stopLoading()
             view.destroy()
@@ -582,17 +1003,21 @@ class WebSessionActivity : ComponentActivity() {
 
     override fun onPause() {
         webView?.let(SessionWebConfiguration::flushCookies)
-        // Keep WhatsApp's file-input JavaScript alive while Android's picker is
-        // on top. Pausing here makes the chooser callback arrive while the page
-        // is suspended, so WhatsApp discards the selected attachment.
         if (pendingFileCallback == null) webView?.onPause()
         super.onPause()
     }
-    override fun onResume() { super.onResume(); webView?.onResume() }
-    override fun onDestroy() { disposeWebView(); super.onDestroy() }
+
+    override fun onResume() {
+        super.onResume()
+        webView?.onResume()
+    }
+
+    override fun onDestroy() {
+        disposeWebView()
+        super.onDestroy()
+    }
 
     companion object {
         private const val FILE_CHOOSER_LOG = "WebFileChooser"
     }
-
 }

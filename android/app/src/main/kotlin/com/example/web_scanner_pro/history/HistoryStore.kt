@@ -21,6 +21,19 @@ class HistoryStore(context: Context) {
         write(retain(combined))
     }
 
+    fun deleteMessage(id: String) = synchronized(lock) {
+        if (id.isBlank()) return
+        val remaining = read().filterNot { it.id == id }
+        write(retain(remaining))
+    }
+
+    fun deleteConversation(title: String, packageName: String) = synchronized(lock) {
+        val remaining = read().filterNot {
+            it.title == title && (packageName.isBlank() || it.packageName == packageName)
+        }
+        write(retain(remaining))
+    }
+
     fun clear() = synchronized(lock) {
         file.delete()
         check(!file.baseFile.exists()) { "Không xóa được lịch sử" }
