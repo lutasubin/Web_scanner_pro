@@ -610,6 +610,53 @@ object WebMobileLayout {
           window.__webScannerKeyboardLocked = $keyboardLocked;
           window.__webScannerWebMode = $webMode;
 
+          var PRELOGIN_STYLE_ID = 'web-scanner-prelogin-style';
+          if (!document.getElementById(PRELOGIN_STYLE_ID) && document.head) {
+            var preStyle = document.createElement('style');
+            preStyle.id = PRELOGIN_STYLE_ID;
+            preStyle.textContent = `
+              html, body { overflow-x: hidden !important; }
+              *::-webkit-scrollbar { width: 0 !important; height: 0 !important; display: none !important; }
+              .x1dr59a3 { height: 100% !important; min-height: 100vh !important; }
+              .xwzfr38 { min-height: 120px !important; }
+              .xdi6fk3 { box-sizing: border-box !important; }
+              @keyframes wsProgressIndeterminate {
+                0% { transform: translateX(-100%); }
+                100% { transform: translateX(250%); }
+              }
+              #web-scanner-logout-status {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 10px;
+                margin-top: 18px;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+              }
+              #web-scanner-logout-bar-track {
+                width: 220px;
+                height: 4px;
+                border-radius: 999px;
+                background: rgba(0, 168, 132, 0.18);
+                overflow: hidden;
+                position: relative;
+              }
+              #web-scanner-logout-bar-fill {
+                width: 45%;
+                height: 100%;
+                border-radius: 999px;
+                background: #00a884;
+                animation: wsProgressIndeterminate 1.25s infinite ease-in-out;
+              }
+              #web-scanner-logout-text {
+                font-size: 13.5px;
+                font-weight: 500;
+                color: #00a884;
+              }
+            `;
+            document.head.appendChild(preStyle);
+          }
+
           if (!window.__webScannerOriginalFocus) {
             window.__webScannerOriginalFocus = HTMLInputElement.prototype.focus;
           }
@@ -634,9 +681,24 @@ object WebMobileLayout {
               return false;
             }
             document.addEventListener('click', function(ev) {
-              if (!window.__webScannerKeyboardLocked) return;
               var t = ev.target;
               if (!t) return;
+              // Detect clicking Confirm Logout inside [role="dialog"]
+              var btn = t.closest ? t.closest('button,[role="button"]') : null;
+              var dlg = t.closest ? t.closest('[role="dialog"]') : null;
+              if (btn && dlg) {
+                var btnText = ((btn.innerText || btn.textContent) || '').trim().toLowerCase();
+                var dlgText = ((dlg.innerText || dlg.textContent) || '').trim().toLowerCase();
+                if ((btnText.includes('đăng xuất') || btnText.includes('log out') || btnText.includes('logout')) &&
+                    (dlgText.includes('đăng xuất') || dlgText.includes('log out') || dlgText.includes('logout'))) {
+                  window.__webScannerLoggingOut = true;
+                  window.__webScannerLoginMode = 'LOADING';
+                  if (window.Android && window.Android.postMessage) {
+                    window.Android.postMessage('webLoading');
+                  }
+                }
+              }
+              if (!window.__webScannerKeyboardLocked) return;
               if (checkInputNode(t) || (t.closest && t.closest('[contenteditable="true"],input,textarea,.copyable-text,.selectable-text'))) {
                 if (window.Android && window.Android.postMessage) {
                   window.Android.postMessage('openKeyBroad');
@@ -645,11 +707,48 @@ object WebMobileLayout {
             }, true);
           }
 
+          function removeLoadingIndicator() {
+            var statusNode = document.getElementById('web-scanner-logout-status');
+            if (statusNode) statusNode.remove();
+            if (window.__webScannerProgressTimer) {
+              clearInterval(window.__webScannerProgressTimer);
+              window.__webScannerProgressTimer = null;
+            }
+          }
+
+          function ensureLoadingIndicator() {
+            var nativeProgress = document.querySelector('progress');
+            if (nativeProgress) {
+              nativeProgress.style.accentColor = '#00a884';
+              if (!window.__webScannerProgressTimer) {
+                var pct = Number(nativeProgress.value) || 12;
+                window.__webScannerProgressTimer = setInterval(function() {
+                  var p = document.querySelector('progress');
+                  if (!p) return;
+                  pct = pct < 88 ? pct + 4 : 25;
+                  try { p.value = pct; p.max = 100; } catch (e) {}
+                }, 220);
+              }
+              var host = nativeProgress.parentElement;
+              if (host && !document.getElementById('web-scanner-logout-status')) {
+                var status = document.createElement('div');
+                status.id = 'web-scanner-logout-status';
+                status.innerHTML = '<div id="web-scanner-logout-bar-track"><div id="web-scanner-logout-bar-fill"></div></div>' +
+                  '<div id="web-scanner-logout-text">' +
+                  (window.__webScannerLoggingOut ? 'Đang đăng xuất và tạo mã QR mới...' : 'Đang tải mã QR đăng nhập...') +
+                  '</div>';
+                host.appendChild(status);
+              }
+            }
+          }
+
           function syncState() {
             var hasMainHeader = Boolean(
-              document.querySelector("#pane-side,[data-testid='chat-list'],header,[data-testid='chatlist-header']")
+              document.querySelector("#pane-side,[data-testid='chat-list'],[data-testid='chatlist-header']")
             );
             if (hasMainHeader) {
+              window.__webScannerLoggingOut = false;
+              removeLoadingIndicator();
               if (!window.__webScannerLoggedSuccessSent) {
                 window.__webScannerLoggedSuccessSent = true;
                 if (window.Android && window.Android.postMessage) {
@@ -669,6 +768,11 @@ object WebMobileLayout {
 
             window.__webScannerLoggedSuccessSent = false;
 
+            // Clean up any post-login mobile layout styles when in pre-login or logging out
+            var postStyle = document.getElementById('web-scanner-mobile-layout');
+            if (postStyle) postStyle.remove();
+            document.body.classList.remove('web-scanner-list', 'web-scanner-detail');
+
             // Pre-login: scale the 580px WhatsApp Web login card to fit the mobile screen cleanly
             var loginZoom = Math.min(1, Math.max(0.52, window.innerWidth / 580));
             document.documentElement.style.zoom = '1';
@@ -679,8 +783,10 @@ object WebMobileLayout {
               appNode.firstElementChild.style.overflowX = 'hidden';
             }
 
-            var qrNode = document.querySelector('div[data-ref^="https://wa.me/settings/linked_devices"],[data-testid="qrcode"],canvas');
-            if (qrNode) {
+            var qrReady = document.querySelector('div[data-ref], [data-testid="qrcode"] canvas, canvas[aria-label*="QR"], canvas');
+            if (qrReady) {
+              window.__webScannerLoggingOut = false;
+              removeLoadingIndicator();
               if (!window.__webScannerOpenedQrHelper) {
                 window.__webScannerOpenedQrHelper = true;
                 if (window.Android && window.Android.postMessage) {
@@ -718,7 +824,9 @@ object WebMobileLayout {
             }
 
             var phoneForm = document.querySelector('form,input[type="tel"],div[aria-details="link-device-phone-number-code-screen-instructions"]');
-            if (phoneForm && !qrNode) {
+            if (phoneForm && !qrReady) {
+              window.__webScannerLoggingOut = false;
+              removeLoadingIndicator();
               if (window.__webScannerLoginMode !== 'CODE') {
                 window.__webScannerLoginMode = 'CODE';
                 if (window.Android && window.Android.postMessage) {
@@ -726,7 +834,18 @@ object WebMobileLayout {
                 }
               }
             }
-            return qrNode || phoneForm ? 'login' : 'loading';
+
+            if (!qrReady && !phoneForm) {
+              ensureLoadingIndicator();
+              if (window.__webScannerLoginMode !== 'LOADING') {
+                window.__webScannerLoginMode = 'LOADING';
+                if (window.Android && window.Android.postMessage) {
+                  window.Android.postMessage('webLoading');
+                }
+              }
+              return 'loading';
+            }
+            return 'login';
           }
 
           if (!window.__webScannerDualObserver) {

@@ -44,7 +44,7 @@ class WebSessionToolbar(
     private lateinit var postLoginGroup: LinearLayout
     private lateinit var keyboardButton: ImageView
     private lateinit var helpButton: ImageView
-    private lateinit var loginModeButton: ImageView
+    private lateinit var modeButton: ImageView
     private lateinit var downloadsButton: ImageView
     private lateinit var moreButton: ImageView
     private var isLoggedIn = false
@@ -54,58 +54,64 @@ class WebSessionToolbar(
     fun build(): View = LinearLayout(activity).apply {
         rootLayout = this
         gravity = Gravity.CENTER_VERTICAL
-        setPadding(dp(8), dp(7), dp(8), dp(7))
+        minimumHeight = dp(56)
+        layoutParams = LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            dp(56),
+        )
+        setPadding(dp(12), 0, dp(16), 0)
         setBackgroundColor(Color.WHITE)
-        elevation = dp(2).toFloat()
 
-        backButton = action(R.drawable.ic_web_back, "Quay lại", onClose)
+        backButton = toolbarIcon(R.drawable.ic_web_back, "Quay lại", marginStartDp = 0, marginEndDp = 12) {
+            onClose()
+        }
         addView(backButton)
 
         addView(
             profilePicker(),
-            LinearLayout.LayoutParams(0, dp(42), 1f).apply {
-                marginStart = dp(4)
-                marginEnd = dp(6)
-            },
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                dp(36),
+            ),
         )
 
-        reloadButton = action(R.drawable.ic_web_refresh, "Tải lại") {
+        // Spacer matching `<View android:layout_width="0dp" android:layout_height="0dp" android:layout_weight="1" />` in activity_web.xml
+        addView(
+            View(activity),
+            LinearLayout.LayoutParams(0, 0, 1f),
+        )
+
+        reloadButton = toolbarIcon(R.drawable.ic_web_refresh, "Tải lại", marginStartDp = 0) {
             animateReload()
             onReload()
         }
         addView(reloadButton)
 
-        // Pre-login actions (layout_unlogin in original app: Help `?` + Switch Login Mode)
+        // Pre-login actions (`layout_unlogin` in original app: Help `?` + Display Mode `⇄`)
         preLoginGroup = LinearLayout(activity).apply {
             gravity = Gravity.CENTER_VERTICAL
-            helpButton = textBadgeAction("?", "Hướng dẫn liên kết") { onHelp() }
-            loginModeButton = ImageView(activity).apply {
-                setImageResource(R.drawable.ic_login_qr)
-                scaleType = ImageView.ScaleType.CENTER_INSIDE
-                setPadding(dp(8), dp(8), dp(8), dp(8))
-                contentDescription = "Chuyển chế độ đăng nhập"
-                isClickable = true
-                isFocusable = true
-                background = selectableBackground()
-                setOnClickListener { onSwitchLoginMode(this) }
-                layoutParams = ViewGroup.LayoutParams(dp(41), dp(44))
+            helpButton = toolbarIcon(R.drawable.ic_web_help, "Hướng dẫn liên kết", marginStartDp = 16) {
+                onHelp()
+            }
+            modeButton = toolbarIcon(R.drawable.ic_web_mode, "Chuyển chế độ hiển thị", marginStartDp = 16) {
+                onShowModeDialog()
             }
             addView(helpButton)
-            addView(loginModeButton)
+            addView(modeButton)
         }
         addView(preLoginGroup)
 
-        // Post-login actions (layout_login in original app: Keyboard Lock, Downloads, More)
+        // Post-login actions (`layout_login` in original app: Keyboard Lock, Downloads, More)
         postLoginGroup = LinearLayout(activity).apply {
             gravity = Gravity.CENTER_VERTICAL
             visibility = View.GONE
-            keyboardButton = action(R.drawable.ic_web_keyboard_lock, "Khóa/Mở bàn phím") {
+            keyboardButton = toolbarIcon(R.drawable.ic_web_keyboard_lock, "Khóa/Mở bàn phím", marginStartDp = 16) {
                 onKeyboardToggle()
             }
-            downloadsButton = action(R.drawable.ic_web_folder_download, "Tệp đã tải xuống") {
+            downloadsButton = toolbarIcon(R.drawable.ic_web_folder_download, "Tệp đã tải xuống", marginStartDp = 16) {
                 onDownloads()
             }
-            moreButton = anchoredAction(R.drawable.ic_web_more, "Tùy chọn khác") { anchor ->
+            moreButton = anchoredToolbarIcon(R.drawable.ic_web_more, "Tùy chọn khác", marginStartDp = 16) { anchor ->
                 showMore(anchor)
             }
             addView(keyboardButton)
@@ -129,14 +135,14 @@ class WebSessionToolbar(
         isKeyboardLocked = locked
         if (::keyboardButton.isInitialized) {
             keyboardButton.background = if (locked) {
-                rounded(0xFFFFEFEF.toInt(), dp(10), 0xFFE53935.toInt())
+                rounded(0xFFFFEFEF.toInt(), dp(8), 0xFFE53935.toInt())
             } else {
                 selectableBackground()
             }
             keyboardButton.imageTintList = ColorStateList.valueOf(
                 if (locked) 0xFFD32F2F.toInt()
                 else if (isDarkMode) Color.WHITE
-                else TEXT,
+                else ICON_COLOR,
             )
         }
     }
@@ -145,9 +151,9 @@ class WebSessionToolbar(
         isDarkMode = dark
         if (!::rootLayout.isInitialized) return
         val bg = if (dark) 0xFF1F2C34.toInt() else Color.WHITE
-        val fg = if (dark) Color.WHITE else TEXT
+        val fg = if (dark) Color.WHITE else ICON_COLOR
         rootLayout.setBackgroundColor(bg)
-        listOf(backButton, reloadButton, downloadsButton, moreButton).forEach {
+        listOf(backButton, reloadButton, helpButton, modeButton, downloadsButton, moreButton).forEach {
             it.imageTintList = ColorStateList.valueOf(fg)
         }
         setKeyboardLocked(isKeyboardLocked)
@@ -173,18 +179,42 @@ class WebSessionToolbar(
         val index = sessions.indexOfFirst { it.id == currentId }.coerceAtLeast(0)
         val palette = ACCOUNT_PALETTES[index % ACCOUNT_PALETTES.size]
         val current = sessions.firstOrNull { it.id == currentId }
-        return TextView(activity).apply {
-            text = "${current?.name ?: "Tài khoản 1"}  ▼"
-            textSize = 15.5f
-            maxLines = 1
-            ellipsize = TextUtils.TruncateAt.END
-            gravity = Gravity.CENTER_VERTICAL
-            setTextColor(palette.first)
-            typeface = Typeface.DEFAULT_BOLD
-            background = rounded(palette.second, dp(21))
-            setPadding(dp(14), 0, dp(12), 0)
+        return LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            background = rounded(palette.second, dp(18))
+            setPadding(dp(10), 0, dp(10), 0)
+            isClickable = true
+            isFocusable = true
             contentDescription = "Chuyển hoặc thêm người dùng"
             setOnClickListener { showProfiles(this) }
+
+            addView(
+                TextView(activity).apply {
+                    text = current?.name ?: "Tài khoản 1"
+                    textSize = 16f
+                    maxWidth = dp(110)
+                    maxLines = 1
+                    ellipsize = TextUtils.TruncateAt.END
+                    gravity = Gravity.CENTER
+                    setTextColor(palette.first)
+                    typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                },
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ),
+            )
+            addView(
+                ImageView(activity).apply {
+                    setImageResource(R.drawable.ic_web_pull)
+                    imageTintList = ColorStateList.valueOf(palette.first)
+                    scaleType = ImageView.ScaleType.FIT_CENTER
+                },
+                LinearLayout.LayoutParams(dp(14), dp(8)).apply {
+                    marginStart = dp(4)
+                },
+            )
         }
     }
 
@@ -367,39 +397,32 @@ class WebSessionToolbar(
         popup.showAsDropDown(anchor, -dp(135), dp(4))
     }
 
-    private fun textBadgeAction(label: String, description: String, listener: () -> Unit) =
-        ImageView(activity).apply {
-            // Use a clean circular question mark badge
-            setImageResource(R.drawable.ic_web_more)
-            scaleType = ImageView.ScaleType.CENTER_INSIDE
-            setPadding(dp(9), dp(9), dp(9), dp(9))
-            contentDescription = description
-            isClickable = true
-            isFocusable = true
-            background = selectableBackground()
-            setOnClickListener { listener() }
-            layoutParams = ViewGroup.LayoutParams(dp(40), dp(44))
-            // Replace with custom drawn `?` icon drawable
-            setImageDrawable(QuestionMarkDrawable(density))
-        }
-
-    private fun action(icon: Int, description: String, listener: () -> Unit) =
-        anchoredAction(icon, description) { _: View -> listener() }
-
-    private fun anchoredAction(
+    private fun toolbarIcon(
         icon: Int,
         description: String,
+        marginStartDp: Int = 0,
+        marginEndDp: Int = 0,
+        listener: () -> Unit,
+    ) = anchoredToolbarIcon(icon, description, marginStartDp, marginEndDp) { _: View -> listener() }
+
+    private fun anchoredToolbarIcon(
+        icon: Int,
+        description: String,
+        marginStartDp: Int = 0,
+        marginEndDp: Int = 0,
         listener: (View) -> Unit,
     ) = ImageView(activity).apply {
         setImageResource(icon)
-        scaleType = ImageView.ScaleType.CENTER_INSIDE
-        setPadding(dp(8), dp(8), dp(8), dp(8))
+        scaleType = ImageView.ScaleType.FIT_CENTER
         contentDescription = description
         isClickable = true
         isFocusable = true
         background = selectableBackground()
         setOnClickListener { listener(this) }
-        layoutParams = ViewGroup.LayoutParams(dp(41), dp(44))
+        layoutParams = LinearLayout.LayoutParams(dp(28), dp(28)).apply {
+            if (marginStartDp > 0) marginStart = dp(marginStartDp)
+            if (marginEndDp > 0) marginEnd = dp(marginEndDp)
+        }
     }
 
     private fun selectableBackground() = activity.obtainStyledAttributes(
@@ -418,48 +441,11 @@ class WebSessionToolbar(
 
     private fun dp(value: Int) = (value * density).toInt()
 
-    private class QuestionMarkDrawable(private val density: Float) : android.graphics.drawable.Drawable() {
-        private val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            color = TEXT
-            textAlign = android.graphics.Paint.Align.CENTER
-            typeface = Typeface.DEFAULT_BOLD
-        }
-        private val circlePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            color = TEXT
-            style = android.graphics.Paint.Style.STROKE
-            strokeWidth = 1.8f * density
-        }
-
-        override fun draw(canvas: android.graphics.Canvas) {
-            val b = bounds
-            val cx = b.exactCenterX()
-            val cy = b.exactCenterY()
-            val r = min(b.width(), b.height()) * 0.30f
-            canvas.drawCircle(cx, cy, r, circlePaint)
-            paint.textSize = r * 1.35f
-            val fm = paint.fontMetrics
-            val ty = cy - (fm.ascent + fm.descent) / 2f
-            canvas.drawText("?", cx, ty, paint)
-        }
-
-        override fun setAlpha(alpha: Int) {
-            paint.alpha = alpha
-            circlePaint.alpha = alpha
-        }
-
-        override fun setColorFilter(colorFilter: android.graphics.ColorFilter?) {
-            paint.colorFilter = colorFilter
-            circlePaint.colorFilter = colorFilter
-        }
-
-        @Deprecated("Deprecated in Java")
-        override fun getOpacity(): Int = android.graphics.PixelFormat.TRANSLUCENT
-    }
-
     companion object {
         private const val GREEN = 0xFF00A884.toInt()
         private const val PALE_GREEN = 0xFFE9F8E7.toInt()
         private const val TEXT = 0xFF202124.toInt()
+        private const val ICON_COLOR = 0xFF333333.toInt()
         private const val DIVIDER = 0xFFE7E9EB.toInt()
 
         // 5 account color palettes from the original app (`WebActivity.setAccountBoxStyle()`)

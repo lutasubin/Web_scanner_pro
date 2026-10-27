@@ -31,6 +31,7 @@ import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
@@ -56,14 +57,13 @@ class WebSessionActivity : ComponentActivity() {
     private lateinit var toolbar: WebSessionToolbar
     private lateinit var message: TextView
     private lateinit var progress: ProgressBar
-    private lateinit var preLoginFab: LinearLayout
-    private lateinit var preLoginFabIcon: ImageView
-    private lateinit var preLoginFabLabel: TextView
+    private lateinit var preLoginFab: ImageButton
     private lateinit var keyboardHintCard: LinearLayout
     private lateinit var downloadHandler: WebDownloadHandler
     private val handler = Handler(Looper.getMainLooper())
     private var readyChecks = 0
     private var isLoggedIn = false
+    private var isLoginReady = false
     private var currentLoginMode = WebMobileLayout.MODE_QR
     private var webMode = 0 // 0 = Advanced Mobile (1-pane), 1 = Basic Desktop
     private var isKeyboardLocked = false
@@ -216,6 +216,10 @@ class WebSessionActivity : ComponentActivity() {
             onAdd = ::showCreateAccount,
             onReload = {
                 readyChecks = 0
+                isLoginReady = false
+                updateLoginModeViews()
+                progress.visibility = View.VISIBLE
+                progress.isIndeterminate = true
                 view.reload()
             },
             onKeyboardToggle = { toggleKeyboardLock(view) },
@@ -256,6 +260,8 @@ class WebSessionActivity : ComponentActivity() {
         progress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
             max = 100
             isIndeterminate = true
+            progressTintList = android.content.res.ColorStateList.valueOf(0xFF08C567.toInt())
+            indeterminateTintList = android.content.res.ColorStateList.valueOf(0xFF08C567.toInt())
             contentDescription = getString(R.string.loading_whatsapp)
         }
         root.addView(
@@ -266,28 +272,13 @@ class WebSessionActivity : ComponentActivity() {
             ),
         )
 
-        // Bottom-right floating quick-switch button (matches original app's ivSwitchLoginMode + helper pill)
-        preLoginFabIcon = ImageView(this).apply {
+        // Bottom-right floating login-mode button matching `ImageButton @0x7f0a00c4` in original app's `activity_web.xml`
+        preLoginFab = ImageButton(this).apply {
+            setBackgroundColor(Color.TRANSPARENT)
             setImageResource(R.drawable.ic_login_code)
             scaleType = ImageView.ScaleType.FIT_CENTER
-        }
-        preLoginFabLabel = TextView(this).apply {
-            text = "Đăng nhập bằng SĐT"
-            textSize = 13.5f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(Color.WHITE)
-            setPadding(dp(8), 0, dp(4), 0)
-        }
-        preLoginFab = LinearLayout(this).apply {
-            gravity = Gravity.CENTER_VERTICAL
-            background = GradientDrawable().apply {
-                setColor(0xFF00A884.toInt())
-                cornerRadius = dp(24).toFloat()
-            }
-            elevation = dp(6).toFloat()
-            setPadding(dp(14), dp(10), dp(14), dp(10))
-            addView(preLoginFabIcon, LinearLayout.LayoutParams(dp(22), dp(22)))
-            addView(preLoginFabLabel)
+            visibility = View.GONE
+            contentDescription = "Chuyển chế độ đăng nhập"
             setOnClickListener {
                 val targetMode = if (currentLoginMode == WebMobileLayout.MODE_QR) {
                     WebMobileLayout.MODE_CODE
@@ -355,12 +346,12 @@ class WebSessionActivity : ComponentActivity() {
             addView(
                 preLoginFab,
                 FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    dp(72),
+                    dp(72),
                     Gravity.BOTTOM or Gravity.END,
                 ).apply {
-                    bottomMargin = dp(18)
-                    marginEnd = dp(16)
+                    bottomMargin = dp(66)
+                    marginEnd = dp(3)
                 },
             )
             addView(
@@ -384,16 +375,15 @@ class WebSessionActivity : ComponentActivity() {
 
     private fun updateLoginModeViews() {
         if (!::preLoginFab.isInitialized) return
-        if (isLoggedIn) {
+        if (isLoggedIn || !isLoginReady) {
             preLoginFab.visibility = View.GONE
             return
         }
         preLoginFab.visibility = View.VISIBLE
         val isQr = currentLoginMode == WebMobileLayout.MODE_QR
-        preLoginFabIcon.setImageResource(
+        preLoginFab.setImageResource(
             if (isQr) R.drawable.ic_login_code else R.drawable.ic_login_qr,
         )
-        preLoginFabLabel.text = if (isQr) "Đăng nhập bằng SĐT" else "Đăng nhập bằng Mã QR"
     }
 
     private fun toggleLoginModeOnWeb(view: WebView, targetMode: String) {
@@ -536,19 +526,37 @@ class WebSessionActivity : ComponentActivity() {
                 when (ev) {
                     WebMobileLayout.MODE_QR -> {
                         currentLoginMode = WebMobileLayout.MODE_QR
+                        isLoginReady = true
                         if (isLoggedIn) {
                             isLoggedIn = false
                             toolbar.setLoggedIn(false)
                         }
+                        progress.visibility = View.GONE
+                        message.visibility = View.GONE
                         updateLoginModeViews()
                     }
                     WebMobileLayout.MODE_CODE -> {
                         currentLoginMode = WebMobileLayout.MODE_CODE
+                        isLoginReady = true
                         if (isLoggedIn) {
                             isLoggedIn = false
                             toolbar.setLoggedIn(false)
                         }
+                        progress.visibility = View.GONE
+                        message.visibility = View.GONE
                         updateLoginModeViews()
+                    }
+                    "webLoading" -> {
+                        isLoginReady = false
+                        if (isLoggedIn) {
+                            isLoggedIn = false
+                            toolbar.setLoggedIn(false)
+                            toolbar.setBackVisible(true)
+                        }
+                        updateLoginModeViews()
+                        progress.visibility = View.VISIBLE
+                        progress.isIndeterminate = true
+                        readyChecks = 0
                     }
                     "openHelper" -> {
                         if (!openedQrHelperThisSession &&
@@ -886,8 +894,11 @@ class WebSessionActivity : ComponentActivity() {
             progress.visibility = View.VISIBLE
             progress.isIndeterminate = false
             progress.progress = value
-        } else {
+        } else if (isLoggedIn || isLoginReady) {
             progress.visibility = View.GONE
+        } else {
+            progress.visibility = View.VISIBLE
+            progress.isIndeterminate = true
         }
     }
 
@@ -907,14 +918,20 @@ class WebSessionActivity : ComponentActivity() {
                     onLoggedInDetected(view)
                 }
                 "\"login\"" -> {
+                    isLoginReady = true
                     progress.visibility = View.GONE
                     message.visibility = View.GONE
+                    updateLoginModeViews()
                     if (++readyChecks < 120) {
                         handler.postDelayed(::checkWebContent, 1000)
                     }
                 }
                 else -> {
+                    isLoginReady = false
+                    updateLoginModeViews()
                     if (++readyChecks < 80) {
+                        progress.visibility = View.VISIBLE
+                        progress.isIndeterminate = true
                         handler.postDelayed(::checkWebContent, 500)
                     } else {
                         progress.visibility = View.GONE
