@@ -53,11 +53,13 @@ class WebBridge(private val activity: Activity) {
                 else -> {
                     store.select(id)
                     val bannerEnabled = call.argument<Boolean>("bannerEnabled") ?: true
+                    val bannerCollapsible = call.argument<Boolean>("bannerCollapsible") ?: true
                     val bannerAdUnitId = call.argument<String>("bannerAdUnitId").orEmpty()
                     activity.startActivity(
                         Intent(activity, WebSessionActivity::class.java)
                             .putExtra("id", id)
                             .putExtra("banner_enabled", bannerEnabled)
+                            .putExtra("banner_collapsible", bannerCollapsible)
                             .putExtra("banner_ad_unit_id", bannerAdUnitId)
                     )
                     result.success(null)

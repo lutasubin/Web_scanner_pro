@@ -21,6 +21,7 @@ class HistoryPage extends StatefulWidget {
 
 class _HistoryPageState extends State<HistoryPage> with WidgetsBindingObserver {
   late final c = Get.find<HistoryController>();
+  int _bannerReloadCount = 0;
 
   @override
   void initState() {
@@ -54,12 +55,15 @@ class _HistoryPageState extends State<HistoryPage> with WidgetsBindingObserver {
           context,
           onAllow: c.openSettings,
         );
+        if (mounted) {
+          setState(() => _bannerReloadCount++);
+        }
       }
     }
   }
 
-  void _openGuidePage() {
-    Navigator.of(context).push(
+  Future<void> _openGuidePage() async {
+    await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => Obx(
           () => GuideNotifyPage(
@@ -69,12 +73,18 @@ class _HistoryPageState extends State<HistoryPage> with WidgetsBindingObserver {
         ),
       ),
     );
+    if (mounted) {
+      setState(() => _bannerReloadCount++);
+    }
   }
 
-  void _openDeletedMediaPage() {
-    Navigator.of(context).push(
+  Future<void> _openDeletedMediaPage() async {
+    await Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => const DeletedMediaPage()),
     );
+    if (mounted) {
+      setState(() => _bannerReloadCount++);
+    }
   }
 
   Future<void> _deleteSelected() async {
@@ -110,7 +120,7 @@ class _HistoryPageState extends State<HistoryPage> with WidgetsBindingObserver {
         backgroundColor: const Color(0xFFF5F6F8),
         bottomNavigationBar: services.isRegistered<RemoteConfigService>()
             ? AppBannerAd(
-                placement: 'chat_list',
+                placement: 'chat_list_$_bannerReloadCount',
                 enabledFlag:
                     services<RemoteConfigService>().bannerHistoryEnabled,
               )

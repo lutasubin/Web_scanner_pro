@@ -21,6 +21,7 @@ class StatusesPage extends StatefulWidget {
 class _StatusesPageState extends State<StatusesPage>
     with WidgetsBindingObserver {
   late final c = Get.find<StatusesController>();
+  int _bannerReloadCount = 0;
 
   @override
   void initState() {
@@ -43,6 +44,9 @@ class _StatusesPageState extends State<StatusesPage>
           context,
           onAllow: c.selectFolder,
         );
+        if (mounted) {
+          setState(() => _bannerReloadCount++);
+        }
       }
     }
   }
@@ -111,7 +115,7 @@ class _StatusesPageState extends State<StatusesPage>
         backgroundColor: const Color(0xFFF5F6F8),
         bottomNavigationBar: services.isRegistered<RemoteConfigService>()
             ? AppBannerAd(
-                placement: 'status_page',
+                placement: 'status_page_tab_${c.activeTab.value}_$_bannerReloadCount',
                 enabledFlag:
                     services<RemoteConfigService>().bannerStatusEnabled,
               )

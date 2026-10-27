@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../core/ads/remote_config_service.dart';
+import '../../core/ads/widgets/app_banner_ad.dart';
+import '../../core/di/di.dart';
+
 /// Matches original app's `dialog_notify_permission.xml`
 Future<bool?> showNotifyPermissionOnboardingDialog(
   BuildContext context, {
@@ -254,6 +258,13 @@ class _GuideNotifyPageState extends State<GuideNotifyPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: const Color(0xFFF5F8F7),
+    bottomNavigationBar: services.isRegistered<RemoteConfigService>()
+        ? AppBannerAd(
+            placement: 'guide_ntf',
+            enabledFlag:
+                services<RemoteConfigService>().bannerHistoryEnabled,
+          )
+        : null,
     appBar: AppBar(
       title: const Text(
         'Hướng dẫn',
@@ -612,6 +623,13 @@ class GuideStoragePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: const Color(0xFFF5F8F7),
+    bottomNavigationBar: services.isRegistered<RemoteConfigService>()
+        ? AppBannerAd(
+            placement: 'storage_guide',
+            enabledFlag:
+                services<RemoteConfigService>().bannerStatusEnabled,
+          )
+        : null,
     appBar: AppBar(
       title: const Text(
         'Hướng dẫn',

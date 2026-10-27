@@ -70,12 +70,20 @@ class HomeController extends TaskController {
 
   Future<void> _launchWebSessionWithAds(String id) async {
     var bannerEnabled = true;
+    var bannerCollapsible = true;
+    var bannerAdUnitId = '';
     if (services.isRegistered<AdService>() &&
         services.isRegistered<RemoteConfigService>()) {
       final adService = services<AdService>();
       final rc = services<RemoteConfigService>();
+      bannerCollapsible = rc.bannerHomeCollapsible.value;
+      bannerAdUnitId = bannerCollapsible
+          ? rc.activeCollapsibleBannerAdUnitId
+          : rc.activeBannerAdUnitId;
       bannerEnabled =
-          rc.adsGlobalEnabled.value && rc.bannerWebEnabled.value;
+          rc.adsGlobalEnabled.value &&
+          rc.bannerWebEnabled.value &&
+          bannerAdUnitId.isNotEmpty;
       await adService.showInterstitial(
         trigger: 'web_into',
         configOn: rc.interWebInto.value,
@@ -85,6 +93,8 @@ class HomeController extends TaskController {
     await _platform.invoke<void>('openSession', {
       'id': id,
       'bannerEnabled': bannerEnabled,
+      'bannerCollapsible': bannerCollapsible,
+      'bannerAdUnitId': bannerAdUnitId,
     });
   }
 }

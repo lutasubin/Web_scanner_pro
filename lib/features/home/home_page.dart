@@ -22,6 +22,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   late final HomeController controller;
+  int _bannerVisitCount = 0;
 
   @override
   void initState() {
@@ -42,9 +43,21 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) controller.load();
   }
 
+  void _bumpBannerVisit() {
+    if (mounted) {
+      setState(() => _bannerVisitCount++);
+    }
+  }
+
   Future<void> _openAccounts() async {
     await Get.toNamed<void>(AppRoutes.sessions);
+    _bumpBannerVisit();
     await controller.load();
+  }
+
+  Future<void> _openSettings() async {
+    await Get.toNamed<void>(AppRoutes.settings);
+    _bumpBannerVisit();
   }
 
   Future<void> _navigateWithInterstitial({
@@ -62,6 +75,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       );
     }
     await Get.toNamed<void>(route);
+    _bumpBannerVisit();
   }
 
   @override
@@ -80,7 +94,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         error: controller.error.value,
         showHandCoachmark: controller.showHandCoachmark.value,
         onDismissHandCoachmark: controller.dismissHandCoachmark,
-        onSettings: () => Get.toNamed<void>(AppRoutes.settings),
+        bannerPlacement: 'home_banner_$_bannerVisitCount',
+        onSettings: _openSettings,
         onAccount: controller.openActive,
         onSelectSession: controller.openSession,
         onAccountManagement: _openAccounts,
@@ -130,6 +145,7 @@ class HomeDashboard extends StatelessWidget {
     required this.onHowToUse,
     this.showHandCoachmark = false,
     this.onDismissHandCoachmark,
+    this.bannerPlacement = 'home_banner',
   });
 
   final List<WebSession> sessions;
@@ -148,6 +164,7 @@ class HomeDashboard extends StatelessWidget {
   final VoidCallback onHowToUse;
   final bool showHandCoachmark;
   final VoidCallback? onDismissHandCoachmark;
+  final String bannerPlacement;
 
   List<WebSession> get _effectiveSessions {
     if (sessions.isNotEmpty) return sessions;
@@ -286,7 +303,7 @@ class HomeDashboard extends StatelessWidget {
                 );
               }
               return AppBannerAd(
-                placement: 'home_banner',
+                placement: bannerPlacement,
                 enabledFlag: rc.bannerHomeEnabled,
                 collapsibleFlag: rc.bannerHomeCollapsible,
               );

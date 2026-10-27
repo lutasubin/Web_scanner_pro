@@ -226,7 +226,7 @@
     },
     "banner_settings_collapsible": {
       "defaultValue": {
-        "value": "false"
+        "value": "true"
       },
       "description": "Sử dụng Collapsible Banner ở đáy màn hình Setting",
       "valueType": "BOOLEAN"

@@ -47,6 +47,7 @@ import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import com.example.web_scanner_pro.MainActivity
 import com.example.web_scanner_pro.R
+import com.google.ads.mediation.admob.AdMobAdapter
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdSize
 import com.google.android.gms.ads.AdView
@@ -58,6 +59,7 @@ class WebSessionActivity : ComponentActivity() {
     private var webView: FixedWidthWebView? = null
     private var bannerAdView: AdView? = null
     private var bannerEnabled: Boolean = true
+    private var bannerCollapsible: Boolean = true
     private var bannerAdUnitId: String = TEST_BANNER_AD_UNIT_ID
     private lateinit var session: StoredWebSession
     private lateinit var toolbar: WebSessionToolbar
@@ -140,6 +142,7 @@ class WebSessionActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         sessionId = intent.getStringExtra("id") ?: "personal"
         bannerEnabled = intent.getBooleanExtra("banner_enabled", true)
+        bannerCollapsible = intent.getBooleanExtra("banner_collapsible", true)
         bannerAdUnitId = intent.getStringExtra("banner_ad_unit_id")
             ?.trim()
             ?.takeIf { it.isNotEmpty() }
@@ -407,17 +410,29 @@ class WebSessionActivity : ComponentActivity() {
                 setAdSize(adSize)
             }
             bannerAdView = adView
-            val adWidthPx = adSize.getWidthInPixels(this)
-            val adHeightPx = adSize.getHeightInPixels(this)
             container.addView(
                 adView,
                 FrameLayout.LayoutParams(
-                    if (adWidthPx > 0) adWidthPx else ViewGroup.LayoutParams.WRAP_CONTENT,
-                    if (adHeightPx > 0) adHeightPx else ViewGroup.LayoutParams.WRAP_CONTENT,
-                    Gravity.CENTER_HORIZONTAL,
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    Gravity.CENTER,
                 ),
             )
-            adView.loadAd(AdRequest.Builder().build())
+            val adRequest = if (bannerCollapsible) {
+                val bundle = Bundle().apply {
+                    putString("collapsible", "bottom")
+                }
+                AdRequest.Builder()
+                    .addNetworkExtrasBundle(AdMobAdapter::class.java, bundle)
+                    .build()
+            } else {
+                AdRequest.Builder().build()
+            }
+            adView.post {
+                if (!isFinishing && !isDestroyed) {
+                    adView.loadAd(adRequest)
+                }
+            }
         } catch (_: Exception) {
             container.visibility = View.GONE
         }
@@ -861,6 +876,8 @@ class WebSessionActivity : ComponentActivity() {
             Intent(this, WebSessionActivity::class.java)
                 .putExtra("id", id)
                 .putExtra("banner_enabled", bannerEnabled)
+                .putExtra("banner_collapsible", bannerCollapsible)
+                .putExtra("banner_ad_unit_id", bannerAdUnitId)
         )
         finish()
     }
@@ -1042,6 +1059,6 @@ class WebSessionActivity : ComponentActivity() {
 
     companion object {
         private const val FILE_CHOOSER_LOG = "WebFileChooser"
-        private const val TEST_BANNER_AD_UNIT_ID = "ca-app-pub-3940256099942544/9214589741"
+        private const val TEST_BANNER_AD_UNIT_ID = "ca-app-pub-3940256099942544/2014213617"
     }
 }

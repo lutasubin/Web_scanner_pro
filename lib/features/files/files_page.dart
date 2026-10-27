@@ -143,7 +143,7 @@ class _FilesPageState extends State<FilesPage> with WidgetsBindingObserver {
         backgroundColor: const Color(0xFFF5F6F8),
         bottomNavigationBar: services.isRegistered<RemoteConfigService>()
             ? AppBannerAd(
-                placement: 'media_list',
+                placement: 'media_list_tab_$tabIdx',
                 enabledFlag:
                     services<RemoteConfigService>().bannerFilesEnabled,
               )

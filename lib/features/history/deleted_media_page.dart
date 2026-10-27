@@ -23,6 +23,8 @@ class _DeletedMediaPageState extends State<DeletedMediaPage>
   late final TabController _tabController;
   final List<MediaRecord> _allItems = [];
   bool _loading = false;
+  int _activeTabIndex = 0;
+  int _bannerReloadCount = 0;
 
   static const _tabs = <String>[
     'Photo',
@@ -36,8 +38,16 @@ class _DeletedMediaPageState extends State<DeletedMediaPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _tabController = TabController(length: _tabs.length, vsync: this);
+    _tabController = TabController(length: _tabs.length, vsync: this)
+      ..addListener(_onTabChanged);
     _initAndLoad();
+  }
+
+  void _onTabChanged() {
+    if (!mounted) return;
+    if (_activeTabIndex != _tabController.index) {
+      setState(() => _activeTabIndex = _tabController.index);
+    }
   }
 
   Future<void> _initAndLoad() async {
@@ -54,6 +64,9 @@ class _DeletedMediaPageState extends State<DeletedMediaPage>
           context,
           onAllow: _selectFolder,
         );
+        if (mounted) {
+          setState(() => _bannerReloadCount++);
+        }
       }
     }
   }
@@ -166,7 +179,7 @@ class _DeletedMediaPageState extends State<DeletedMediaPage>
     backgroundColor: const Color(0xFFF5F6F8),
     bottomNavigationBar: services.isRegistered<RemoteConfigService>()
         ? AppBannerAd(
-            placement: 'media_list',
+            placement: 'deleted_media_tab_${_activeTabIndex}_$_bannerReloadCount',
             enabledFlag: services<RemoteConfigService>().bannerFilesEnabled,
           )
         : null,

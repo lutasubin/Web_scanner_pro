@@ -54,6 +54,9 @@ class _AppBannerAdState extends State<AppBannerAd> {
       defaultTargetPlatform == TargetPlatform.android &&
       !Get.testMode;
 
+  RxBool _effectiveCollapsibleRx(RemoteConfigService rc) =>
+      widget.collapsibleFlag ?? rc.bannerHomeCollapsible;
+
   @override
   void initState() {
     super.initState();
@@ -63,7 +66,7 @@ class _AppBannerAdState extends State<AppBannerAd> {
         [
           rc.adsGlobalEnabled,
           widget.enabledFlag,
-          if (widget.collapsibleFlag != null) widget.collapsibleFlag!,
+          _effectiveCollapsibleRx(rc),
           rc.adUnitBannerAndroid,
           rc.adUnitBannerIos,
           rc.adUnitBannerCollapsibleAndroid,
@@ -73,7 +76,7 @@ class _AppBannerAdState extends State<AppBannerAd> {
           if (!mounted) return;
           final shouldShow =
               rc.adsGlobalEnabled.value && widget.enabledFlag.value;
-          final wantCollapsible = widget.collapsibleFlag?.value ?? false;
+          final wantCollapsible = _effectiveCollapsibleRx(rc).value;
           final wantUnitId = wantCollapsible
               ? rc.activeCollapsibleBannerAdUnitId
               : rc.activeBannerAdUnitId;
@@ -99,6 +102,22 @@ class _AppBannerAdState extends State<AppBannerAd> {
           }
         },
       );
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant AppBannerAd oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.placement != widget.placement) {
+      if (_useAndroidPlatformView) {
+        setState(() {
+          _androidAdFailed = false;
+          _reloadToken++;
+        });
+      } else {
+        _disposeIosBanner();
+        _loadIosBannerIfNeeded();
+      }
     }
   }
 
@@ -158,7 +177,7 @@ class _AppBannerAdState extends State<AppBannerAd> {
       return;
     }
 
-    final isCollapsible = widget.collapsibleFlag?.value ?? false;
+    final isCollapsible = _effectiveCollapsibleRx(rc).value;
     _lastCollapsible = isCollapsible;
 
     final adUnitId = isCollapsible
@@ -238,7 +257,7 @@ class _AppBannerAdState extends State<AppBannerAd> {
       final enabled = rc.adsGlobalEnabled.value && widget.enabledFlag.value;
       if (!enabled) return const SizedBox.shrink();
 
-      final isCollapsible = widget.collapsibleFlag?.value ?? false;
+      final isCollapsible = _effectiveCollapsibleRx(rc).value;
       final adUnitId = isCollapsible
           ? rc.activeCollapsibleBannerAdUnitId
           : rc.activeBannerAdUnitId;

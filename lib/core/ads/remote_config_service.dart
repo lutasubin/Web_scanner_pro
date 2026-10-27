@@ -51,7 +51,7 @@ class RemoteConfigService {
   final bannerHomeEnabled = true.obs;
   final bannerHomeCollapsible = true.obs;
   final bannerSettingsEnabled = true.obs;
-  final bannerSettingsCollapsible = false.obs;
+  final bannerSettingsCollapsible = true.obs;
   final bannerWebEnabled = true.obs;
   final bannerStatusEnabled = true.obs;
   final bannerHistoryEnabled = true.obs;
@@ -151,7 +151,7 @@ class RemoteConfigService {
     'banner_home_enabled': true,
     'banner_home_collapsible': true,
     'banner_settings_enabled': true,
-    'banner_settings_collapsible': false,
+    'banner_settings_collapsible': true,
     'banner_web_enabled': true,
     'banner_status_enabled': true,
     'banner_history_enabled': true,

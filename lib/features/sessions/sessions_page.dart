@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../core/ads/remote_config_service.dart';
+import '../../core/ads/widgets/app_banner_ad.dart';
+import '../../core/di/di.dart';
 import '../../core/widgets/confirm_action.dart';
 import '../../core/widgets/task_feedback.dart';
 import '../help/how_to_use_page.dart';
@@ -73,6 +76,15 @@ class _SessionsPageState extends State<SessionsPage>
   Widget build(BuildContext context) => Obx(() {
     final inReorder = controller.reorderMode.value;
     return Scaffold(
+      bottomNavigationBar: services.isRegistered<RemoteConfigService>()
+          ? AppBannerAd(
+              placement: 'accounts_page',
+              enabledFlag:
+                  services<RemoteConfigService>().bannerHomeEnabled,
+              collapsibleFlag:
+                  services<RemoteConfigService>().bannerHomeCollapsible,
+            )
+          : null,
       appBar: AppBar(
         title: const Text('Accounts Management'),
         actions: [
