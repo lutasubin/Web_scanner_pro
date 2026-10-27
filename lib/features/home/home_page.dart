@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../core/ads/ad_service.dart';
+import '../../core/ads/remote_config_service.dart';
+import '../../core/ads/widgets/app_banner_ad.dart';
+import '../../core/ads/widgets/app_native_ad.dart';
+import '../../core/ads/widgets/exit_app_dialog.dart';
+import '../../core/di/di.dart';
 import '../../core/router/app_routes.dart';
 import '../help/how_to_use_page.dart';
 import '../sessions/web_session.dart';
@@ -41,25 +47,66 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     await controller.load();
   }
 
+  Future<void> _navigateWithInterstitial({
+    required String trigger,
+    required bool Function(RemoteConfigService rc) flagSelector,
+    required String route,
+  }) async {
+    if (services.isRegistered<AdService>() &&
+        services.isRegistered<RemoteConfigService>()) {
+      final adService = services<AdService>();
+      final rc = services<RemoteConfigService>();
+      await adService.showInterstitial(
+        trigger: trigger,
+        configOn: flagSelector(rc),
+      );
+    }
+    await Get.toNamed<void>(route);
+  }
+
   @override
-  Widget build(BuildContext context) => Obx(
-    () => HomeDashboard(
-      sessions: controller.sessions.toList(),
-      activeSession: controller.activeSession,
-      loading: controller.busy.value,
-      error: controller.error.value,
-      showHandCoachmark: controller.showHandCoachmark.value,
-      onDismissHandCoachmark: controller.dismissHandCoachmark,
-      onSettings: () => Get.toNamed<void>(AppRoutes.settings),
-      onAccount: controller.openActive,
-      onSelectSession: controller.openSession,
-      onAccountManagement: _openAccounts,
-      onDualApp: controller.openActive,
-      onDeletedMessages: () => Get.toNamed<void>(AppRoutes.history),
-      onDownloads: () => Get.toNamed<void>(AppRoutes.files),
-      onStatusSaver: () => Get.toNamed<void>(AppRoutes.statuses),
-      onDirectChat: () => Get.toNamed<void>(AppRoutes.directChat),
-      onHowToUse: () => showHowToUseBottomSheet(context),
+  Widget build(BuildContext context) => PopScope(
+    canPop: false,
+    onPopInvokedWithResult: (didPop, _) {
+      if (!didPop) {
+        showExitAppDialog(context);
+      }
+    },
+    child: Obx(
+      () => HomeDashboard(
+        sessions: controller.sessions.toList(),
+        activeSession: controller.activeSession,
+        loading: controller.busy.value,
+        error: controller.error.value,
+        showHandCoachmark: controller.showHandCoachmark.value,
+        onDismissHandCoachmark: controller.dismissHandCoachmark,
+        onSettings: () => Get.toNamed<void>(AppRoutes.settings),
+        onAccount: controller.openActive,
+        onSelectSession: controller.openSession,
+        onAccountManagement: _openAccounts,
+        onDualApp: controller.openActive,
+        onDeletedMessages: () => _navigateWithInterstitial(
+          trigger: 'sessionList_into',
+          flagSelector: (rc) => rc.interHistoryInto.value,
+          route: AppRoutes.history,
+        ),
+        onDownloads: () => _navigateWithInterstitial(
+          trigger: 'downloads_into',
+          flagSelector: (rc) => rc.interFilesInto.value,
+          route: AppRoutes.files,
+        ),
+        onStatusSaver: () => _navigateWithInterstitial(
+          trigger: 'status_into',
+          flagSelector: (rc) => rc.interStatusInto.value,
+          route: AppRoutes.statuses,
+        ),
+        onDirectChat: () => _navigateWithInterstitial(
+          trigger: 'directChat_into',
+          flagSelector: (rc) => rc.interDirectChatInto.value,
+          route: AppRoutes.directChat,
+        ),
+        onHowToUse: () => showHowToUseBottomSheet(context),
+      ),
     ),
   );
 }
@@ -226,6 +273,25 @@ class HomeDashboard extends StatelessWidget {
           ),
         ),
       ),
+      bottomNavigationBar: services.isRegistered<RemoteConfigService>()
+          ? Obx(() {
+              final rc = services<RemoteConfigService>();
+              if (rc.nativeHomeCollabStyle.value > 0) {
+                return SafeArea(
+                  top: false,
+                  child: AppNativeAd(
+                    placement: 'home_collab',
+                    styleRx: rc.nativeHomeCollabStyle,
+                  ),
+                );
+              }
+              return AppBannerAd(
+                placement: 'home_banner',
+                enabledFlag: rc.bannerHomeEnabled,
+                collapsibleFlag: rc.bannerHomeCollapsible,
+              );
+            })
+          : null,
     );
   }
 }

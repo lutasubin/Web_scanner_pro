@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../core/ads/ad_service.dart';
+import '../../core/ads/remote_config_service.dart';
+import '../../core/ads/widgets/app_banner_ad.dart';
+import '../../core/ads/widgets/app_native_ad.dart';
+import '../../core/di/di.dart';
 import '../../core/models/media_record.dart';
 import '../../core/widgets/confirm_action.dart';
 import '../../core/widgets/media_preview.dart';
@@ -123,9 +128,27 @@ class _FilesPageState extends State<FilesPage> with WidgetsBindingObserver {
               .where((e) => !e.isImage && !e.isVideo)
               .toList(growable: false);
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F6F8),
-      appBar: AppBar(
+    return PopScope(
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop &&
+            services.isRegistered<AdService>() &&
+            services.isRegistered<RemoteConfigService>()) {
+          services<AdService>().showInterstitial(
+            trigger: 'downloads_back',
+            configOn: services<RemoteConfigService>().interFilesBack.value,
+          );
+        }
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF5F6F8),
+        bottomNavigationBar: services.isRegistered<RemoteConfigService>()
+            ? AppBannerAd(
+                placement: 'media_list',
+                enabledFlag:
+                    services<RemoteConfigService>().bannerFilesEnabled,
+              )
+            : null,
+        appBar: AppBar(
         backgroundColor: Colors.white,
         title: Text(
           inSelection ? 'Selected (${c.selectedIds.length})' : 'downloads'.tr,
@@ -230,7 +253,7 @@ class _FilesPageState extends State<FilesPage> with WidgetsBindingObserver {
                           itemBuilder: (context, index) {
                             final file = list[index];
                             final selected = c.selectedIds.contains(file.id);
-                            return _FileRowCard(
+                            final rowCard = _FileRowCard(
                               file: file,
                               selectionMode: inSelection,
                               selected: selected,
@@ -245,6 +268,24 @@ class _FilesPageState extends State<FilesPage> with WidgetsBindingObserver {
                               onShare: () => c.share(file),
                               onDelete: () => _delete(file),
                             );
+                            if (index == 0 &&
+                                services.isRegistered<RemoteConfigService>()) {
+                              return Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  rowCard,
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 10),
+                                    child: AppNativeAd(
+                                      placement: 'doc_list',
+                                      styleRx: services<RemoteConfigService>()
+                                          .nativeListStyle,
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }
+                            return rowCard;
                           },
                         ),
                 ),
@@ -281,6 +322,7 @@ class _FilesPageState extends State<FilesPage> with WidgetsBindingObserver {
           ),
         ),
       ),
+    ),
     );
   });
 }

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "599841116142",
+    "project_id": "web-b0480",
+    "storage_bucket": "web-b0480.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:599841116142:android:095fff945b8c8bb01c48ff",
+        "android_client_info": {
+          "package_name": "com.example.web_scanner_pro"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBFSVZhEEDYe99w3byAh456YGVlHO-Qdj4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

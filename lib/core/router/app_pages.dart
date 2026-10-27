@@ -14,6 +14,7 @@ import '../../features/onboarding/language_page.dart';
 import '../../features/onboarding/splash_page.dart';
 import '../../features/sessions/sessions_page.dart';
 import '../../features/sessions/sessions_controller.dart';
+import '../../features/settings/ads_debug_page.dart';
 import '../../features/settings/settings_page.dart';
 import '../../features/statuses/statuses_page.dart';
 import '../../features/statuses/statuses_controller.dart';
@@ -86,6 +87,7 @@ class AppPages {
       ),
     ),
     GetPage(name: AppRoutes.settings, page: SettingsPage.new),
+    GetPage(name: AppRoutes.adsDebug, page: AdsDebugPage.new),
     GetPage(name: AppRoutes.howToUse, page: HowToUsePage.new),
     GetPage(
       name: AppRoutes.guideNotify,

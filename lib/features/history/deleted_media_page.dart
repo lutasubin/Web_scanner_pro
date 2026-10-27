@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../core/ads/remote_config_service.dart';
+import '../../core/ads/widgets/app_banner_ad.dart';
+import '../../core/ads/widgets/app_native_ad.dart';
 import '../../core/di/di.dart';
 import '../../core/models/media_record.dart';
 import '../../core/platform/app_platform.dart';
@@ -161,6 +164,12 @@ class _DeletedMediaPageState extends State<DeletedMediaPage>
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: const Color(0xFFF5F6F8),
+    bottomNavigationBar: services.isRegistered<RemoteConfigService>()
+        ? AppBannerAd(
+            placement: 'media_list',
+            enabledFlag: services<RemoteConfigService>().bannerFilesEnabled,
+          )
+        : null,
     appBar: AppBar(
       backgroundColor: Colors.white,
       title: const Text(
@@ -238,7 +247,7 @@ class _DeletedMediaPageState extends State<DeletedMediaPage>
                   separatorBuilder: (_, _) => const SizedBox(height: 8),
                   itemBuilder: (context, idx) {
                     final item = list[idx];
-                    return Card(
+                    final card = Card(
                       child: ListTile(
                         onTap: () => _openItem(list, idx),
                         leading: SizedBox(
@@ -259,6 +268,22 @@ class _DeletedMediaPageState extends State<DeletedMediaPage>
                         subtitle: Text(item.sizeLabel),
                       ),
                     );
+                    if (idx == 0 &&
+                        services.isRegistered<RemoteConfigService>()) {
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          card,
+                          const SizedBox(height: 8),
+                          AppNativeAd(
+                            placement: 'media_list',
+                            styleRx:
+                                services<RemoteConfigService>().nativeListStyle,
+                          ),
+                        ],
+                      );
+                    }
+                    return card;
                   },
                 );
               }),

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../core/ads/ad_service.dart';
 import '../../core/di/di.dart';
 import '../../core/platform/app_platform.dart';
 import '../../core/repositories/preferences_repository.dart';
@@ -88,6 +89,12 @@ class _SplashPageState extends State<SplashPage>
     } catch (_) {}
 
     final onboardingDone = prefs.value.value.onboardingDone;
+    if (services.isRegistered<AdService>()) {
+      final adService = services<AdService>();
+      await adService.showColdStartAd();
+      adService.markLeftSplash();
+    }
+    if (!mounted) return;
     if (!onboardingDone) {
       await Get.offAllNamed<void>(
         AppRoutes.languages,

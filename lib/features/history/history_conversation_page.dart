@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
+import '../../core/ads/ad_service.dart';
+import '../../core/ads/remote_config_service.dart';
+import '../../core/ads/widgets/app_banner_ad.dart';
+import '../../core/di/di.dart';
 import '../../core/widgets/confirm_action.dart';
 import 'history_controller.dart';
 import 'history_message.dart';
@@ -49,9 +53,27 @@ class HistoryConversationPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isBusiness = packageName.endsWith('.w4b');
-    return Scaffold(
-      backgroundColor: const Color(0xFFEFEAE2),
-      appBar: AppBar(
+    return PopScope(
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop &&
+            services.isRegistered<AdService>() &&
+            services.isRegistered<RemoteConfigService>()) {
+          services<AdService>().showInterstitial(
+            trigger: 'session_back',
+            configOn: services<RemoteConfigService>().interHistoryBack.value,
+          );
+        }
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFEFEAE2),
+        bottomNavigationBar: services.isRegistered<RemoteConfigService>()
+            ? AppBannerAd(
+                placement: 'messages_page',
+                enabledFlag:
+                    services<RemoteConfigService>().bannerHistoryEnabled,
+              )
+            : null,
+        appBar: AppBar(
         titleSpacing: 0,
         title: Row(
           children: [
@@ -164,6 +186,7 @@ class HistoryConversationPage extends StatelessWidget {
           );
         }),
       ),
+    ),
     );
   }
 }

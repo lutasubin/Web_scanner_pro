@@ -1,5 +1,7 @@
 import 'package:get_it/get_it.dart';
 
+import '../ads/ad_service.dart';
+import '../ads/remote_config_service.dart';
 import '../platform/app_platform.dart';
 import '../repositories/media_repository.dart';
 import '../repositories/preferences_repository.dart';
@@ -11,6 +13,10 @@ Future<void> configureDependencies({AppPlatform? platform}) async {
   services.registerLazySingleton<AppPlatform>(() => platform ?? AppPlatform());
   services.registerLazySingleton(() => MediaRepository(services()));
   services.registerLazySingleton(() => PreferencesRepository(services()));
+  services.registerLazySingleton<RemoteConfigService>(RemoteConfigService.new);
+  services.registerLazySingleton<AdService>(
+    () => AdService(services<RemoteConfigService>()),
+  );
   try {
     await services<PreferencesRepository>().load();
   } catch (_) {

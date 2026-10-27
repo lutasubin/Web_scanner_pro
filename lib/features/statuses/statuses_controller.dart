@@ -1,5 +1,7 @@
 import 'package:get/get.dart';
 
+import '../../core/ads/ad_service.dart';
+import '../../core/di/di.dart';
 import '../../core/models/media_record.dart';
 import '../../core/platform/app_platform.dart';
 import '../../core/repositories/media_repository.dart';
@@ -55,6 +57,9 @@ class StatusesController extends TaskController {
     error.value = '';
     notice.value = '';
     try {
+      if (services.isRegistered<AdService>()) {
+        services<AdService>().suppressNextHotOpen();
+      }
       final selected =
           await _platform.invoke<bool>('selectStatusFolder', {
             'business': business.value,

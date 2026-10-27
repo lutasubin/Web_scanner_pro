@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
+import '../../core/ads/remote_config_service.dart';
+import '../../core/ads/widgets/app_banner_ad.dart';
+import '../../core/di/di.dart';
 import '../../core/router/app_routes.dart';
 
 class SettingsPage extends StatelessWidget {
@@ -74,6 +77,15 @@ class SettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: const Color(0xFFF5F6F8),
+    bottomNavigationBar: services.isRegistered<RemoteConfigService>()
+        ? AppBannerAd(
+            placement: 'settings_page',
+            enabledFlag:
+                services<RemoteConfigService>().bannerSettingsEnabled,
+            collapsibleFlag:
+                services<RemoteConfigService>().bannerSettingsCollapsible,
+          )
+        : null,
     appBar: AppBar(
       backgroundColor: const Color(0xFFF5F6F8),
       title: Text(
@@ -132,6 +144,13 @@ class SettingsPage extends StatelessWidget {
                   title: 'Privacy Policy',
                   body: _kPrivacyPolicyText,
                 ),
+              ),
+              const SizedBox(height: 12),
+              _SettingRowCard(
+                key: const Key('settings-ads-debug'),
+                icon: Icons.ads_click_rounded,
+                title: 'Ads & Remote Config (Test Mode)',
+                onTap: () => Get.toNamed<void>(AppRoutes.adsDebug),
               ),
             ],
           ),
@@ -198,6 +217,15 @@ class _LegalDocumentPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: const Color(0xFFF5F6F8),
+    bottomNavigationBar: services.isRegistered<RemoteConfigService>()
+        ? AppBannerAd(
+            placement: 'settings_page',
+            enabledFlag:
+                services<RemoteConfigService>().bannerSettingsEnabled,
+            collapsibleFlag:
+                services<RemoteConfigService>().bannerSettingsCollapsible,
+          )
+        : null,
     appBar: AppBar(
       backgroundColor: Colors.white,
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),

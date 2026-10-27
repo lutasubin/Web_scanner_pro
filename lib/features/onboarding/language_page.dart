@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../core/ads/remote_config_service.dart';
+import '../../core/ads/widgets/app_native_ad.dart';
 import '../../core/di/di.dart';
 import '../../core/repositories/preferences_repository.dart';
 import '../../core/router/app_routes.dart';
@@ -175,48 +177,59 @@ class _LanguagePageState extends State<LanguagePage> {
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 600),
-          child: ListView.separated(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
-            itemCount: kSupportedLanguages.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 10),
-            itemBuilder: (context, index) {
-              final item = kSupportedLanguages[index];
-              final selected = item.code == _selectedCode;
-              return Material(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                child: InkWell(
-                  key: Key('lang-${item.code}'),
-                  borderRadius: BorderRadius.circular(14),
-                  onTap: () => _selectLanguage(item.code),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 18,
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            item.nativeName,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: selected
-                                  ? FontWeight.w800
-                                  : FontWeight.w700,
-                              color: selected
-                                  ? const Color(0xFF08C567)
-                                  : const Color(0xFF1C1F1D),
-                            ),
+          child: Column(
+            children: [
+              Expanded(
+                child: ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                  itemCount: kSupportedLanguages.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 10),
+                  itemBuilder: (context, index) {
+                    final item = kSupportedLanguages[index];
+                    final selected = item.code == _selectedCode;
+                    return Material(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      child: InkWell(
+                        key: Key('lang-${item.code}'),
+                        borderRadius: BorderRadius.circular(14),
+                        onTap: () => _selectLanguage(item.code),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 18,
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  item.nativeName,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: selected
+                                        ? FontWeight.w800
+                                        : FontWeight.w700,
+                                    color: selected
+                                        ? const Color(0xFF08C567)
+                                        : const Color(0xFF1C1F1D),
+                                  ),
+                                ),
+                              ),
+                              _LanguageRadioIcon(selected: selected),
+                            ],
                           ),
                         ),
-                        _LanguageRadioIcon(selected: selected),
-                      ],
-                    ),
-                  ),
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
+              ),
+              if (services.isRegistered<RemoteConfigService>())
+                AppNativeAd(
+                  placement: 'language_page',
+                  styleRx: services<RemoteConfigService>().nativeLangStyle,
+                ),
+            ],
           ),
         ),
       ),

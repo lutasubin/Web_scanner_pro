@@ -47,12 +47,18 @@ import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import com.example.web_scanner_pro.MainActivity
 import com.example.web_scanner_pro.R
+import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.AdSize
+import com.google.android.gms.ads.AdView
 import java.io.File
 
 class WebSessionActivity : ComponentActivity() {
     var sessionId: String = "personal"
         private set
     private var webView: FixedWidthWebView? = null
+    private var bannerAdView: AdView? = null
+    private var bannerEnabled: Boolean = true
+    private var bannerAdUnitId: String = TEST_BANNER_AD_UNIT_ID
     private lateinit var session: StoredWebSession
     private lateinit var toolbar: WebSessionToolbar
     private lateinit var message: TextView
@@ -133,6 +139,11 @@ class WebSessionActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         sessionId = intent.getStringExtra("id") ?: "personal"
+        bannerEnabled = intent.getBooleanExtra("banner_enabled", true)
+        bannerAdUnitId = intent.getStringExtra("banner_ad_unit_id")
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?: TEST_BANNER_AD_UNIT_ID
         session = WebSessionStore(this).find(sessionId) ?: run { finish(); return }
         if (SessionProfiles.isResetting(sessionId) ||
             (sessionId != WebSessionStore.DEFAULT_ID && !WebBridge.supportsProfiles())
@@ -368,9 +379,48 @@ class WebSessionActivity : ComponentActivity() {
             )
         }
         root.addView(content, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
+        if (bannerEnabled) {
+            val bannerContainer = FrameLayout(this).apply {
+                setBackgroundColor(Color.WHITE)
+            }
+            root.addView(
+                bannerContainer,
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ),
+            )
+            attachAdaptiveTestBanner(bannerContainer)
+        }
         setContentView(root)
         view.overScrollMode = View.OVER_SCROLL_NEVER
         updateLoginModeViews()
+    }
+
+    private fun attachAdaptiveTestBanner(container: FrameLayout) {
+        try {
+            val displayMetrics = resources.displayMetrics
+            val adWidthDp = (displayMetrics.widthPixels / displayMetrics.density).toInt().coerceAtLeast(320)
+            val adSize = AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(this, adWidthDp)
+            val adView = AdView(this).apply {
+                adUnitId = bannerAdUnitId
+                setAdSize(adSize)
+            }
+            bannerAdView = adView
+            val adWidthPx = adSize.getWidthInPixels(this)
+            val adHeightPx = adSize.getHeightInPixels(this)
+            container.addView(
+                adView,
+                FrameLayout.LayoutParams(
+                    if (adWidthPx > 0) adWidthPx else ViewGroup.LayoutParams.WRAP_CONTENT,
+                    if (adHeightPx > 0) adHeightPx else ViewGroup.LayoutParams.WRAP_CONTENT,
+                    Gravity.CENTER_HORIZONTAL,
+                ),
+            )
+            adView.loadAd(AdRequest.Builder().build())
+        } catch (_: Exception) {
+            container.visibility = View.GONE
+        }
     }
 
     private fun updateLoginModeViews() {
@@ -807,7 +857,11 @@ class WebSessionActivity : ComponentActivity() {
     private fun switchSession(id: String) {
         if (id == sessionId) return
         WebSessionStore(this).select(id)
-        startActivity(Intent(this, WebSessionActivity::class.java).putExtra("id", id))
+        startActivity(
+            Intent(this, WebSessionActivity::class.java)
+                .putExtra("id", id)
+                .putExtra("banner_enabled", bannerEnabled)
+        )
         finish()
     }
 
@@ -963,17 +1017,21 @@ class WebSessionActivity : ComponentActivity() {
             view.destroy()
         }
         webView = null
+        bannerAdView?.destroy()
+        bannerAdView = null
         SessionProfiles.unregister(this)
     }
 
     override fun onPause() {
         webView?.let(SessionWebConfiguration::flushCookies)
         if (pendingFileCallback == null) webView?.onPause()
+        bannerAdView?.pause()
         super.onPause()
     }
 
     override fun onResume() {
         super.onResume()
+        bannerAdView?.resume()
         webView?.onResume()
     }
 
@@ -984,5 +1042,6 @@ class WebSessionActivity : ComponentActivity() {
 
     companion object {
         private const val FILE_CHOOSER_LOG = "WebFileChooser"
+        private const val TEST_BANNER_AD_UNIT_ID = "ca-app-pub-3940256099942544/9214589741"
     }
 }

@@ -1,5 +1,7 @@
 import 'package:get/get.dart';
 
+import '../../core/ads/ad_service.dart';
+import '../../core/di/di.dart';
 import '../../core/platform/app_platform.dart';
 import '../../core/repositories/preferences_repository.dart';
 import '../../core/viewmodels/task_controller.dart';
@@ -171,8 +173,12 @@ class HistoryController extends TaskController {
     success: value ? 'Đã bật lưu thông báo mới.' : 'Đã tắt lưu thông báo mới.',
   );
 
-  Future<void> openSettings() =>
-      perform(() => _platform.invoke<void>('openNotificationSettings'));
+  Future<void> openSettings() => perform(() async {
+    if (services.isRegistered<AdService>()) {
+      services<AdService>().suppressNextHotOpen();
+    }
+    await _platform.invoke<void>('openNotificationSettings');
+  });
 
   Future<void> deleteMessage(String id) => perform(() async {
     if (id.startsWith('sample_')) return;

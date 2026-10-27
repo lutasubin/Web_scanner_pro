@@ -1,5 +1,8 @@
 import 'package:get/get.dart';
 
+import '../../core/ads/ad_service.dart';
+import '../../core/ads/remote_config_service.dart';
+import '../../core/di/di.dart';
 import '../../core/platform/app_platform.dart';
 import '../../core/viewmodels/task_controller.dart';
 import 'web_session.dart';
@@ -47,8 +50,30 @@ class SessionsController extends TaskController {
     }
   }
 
-  Future<void> open(String id) =>
-      perform(() => _platform.invoke<void>('openSession', {'id': id}));
+  Future<void> open(String id) => perform(() async {
+    var bannerEnabled = true;
+    var bannerAdUnitId = '';
+    if (services.isRegistered<AdService>() &&
+        services.isRegistered<RemoteConfigService>()) {
+      final adService = services<AdService>();
+      final rc = services<RemoteConfigService>();
+      bannerAdUnitId = rc.activeBannerAdUnitId;
+      bannerEnabled =
+          rc.adsGlobalEnabled.value &&
+          rc.bannerWebEnabled.value &&
+          bannerAdUnitId.isNotEmpty;
+      await adService.showInterstitial(
+        trigger: 'web_into',
+        configOn: rc.interWebInto.value,
+      );
+      adService.markEnteringWebSession();
+    }
+    await _platform.invoke<void>('openSession', {
+      'id': id,
+      'bannerEnabled': bannerEnabled,
+      'bannerAdUnitId': bannerAdUnitId,
+    });
+  });
 
   Future<void> reset(String id) => perform(
     () => _platform.invoke<void>('resetSession', {'id': id}),

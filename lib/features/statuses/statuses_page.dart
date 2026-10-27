@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../core/ads/ad_service.dart';
+import '../../core/ads/remote_config_service.dart';
+import '../../core/ads/widgets/app_banner_ad.dart';
 import '../../core/di/di.dart';
 import '../../core/models/media_record.dart';
 import '../../core/repositories/preferences_repository.dart';
@@ -93,9 +96,27 @@ class _StatusesPageState extends State<StatusesPage>
     final list = c.currentTabItems;
     final isSavedTab = c.activeTab.value == 1;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F6F8),
-      appBar: AppBar(
+    return PopScope(
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop &&
+            services.isRegistered<AdService>() &&
+            services.isRegistered<RemoteConfigService>()) {
+          services<AdService>().showInterstitial(
+            trigger: 'status_back',
+            configOn: services<RemoteConfigService>().interStatusBack.value,
+          );
+        }
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF5F6F8),
+        bottomNavigationBar: services.isRegistered<RemoteConfigService>()
+            ? AppBannerAd(
+                placement: 'status_page',
+                enabledFlag:
+                    services<RemoteConfigService>().bannerStatusEnabled,
+              )
+            : null,
+        appBar: AppBar(
         backgroundColor: Colors.white,
         title: Text(
           inSelection
@@ -338,6 +359,7 @@ class _StatusesPageState extends State<StatusesPage>
           ),
         ),
       ),
+    ),
     );
   });
 }

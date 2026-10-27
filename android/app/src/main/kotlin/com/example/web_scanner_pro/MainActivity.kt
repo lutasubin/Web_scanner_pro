@@ -1,6 +1,10 @@
 package com.example.web_scanner_pro
 
 import android.content.Intent
+import com.example.web_scanner_pro.ads.DualAppBannerFactory
+import com.example.web_scanner_pro.ads.DualAppNativeAdManager
+import com.example.web_scanner_pro.ads.DualAppNativeFactory
+import com.example.web_scanner_pro.ads.WebScannerNativeAdFactory
 import com.example.web_scanner_pro.history.HistoryBridge
 import com.example.web_scanner_pro.media.MediaBridge
 import com.example.web_scanner_pro.platform.DirectChatBridge
@@ -16,6 +20,21 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        WebScannerNativeAdFactory.registerAll(flutterEngine, layoutInflater)
+        flutterEngine
+            .platformViewsController
+            .registry
+            .registerViewFactory(
+                "com.example.dual_app/banner_ad",
+                DualAppBannerFactory(flutterEngine.dartExecutor.binaryMessenger) { this },
+            )
+        flutterEngine
+            .platformViewsController
+            .registry
+            .registerViewFactory(
+                "com.example.dual_app/native_ad",
+                DualAppNativeFactory(flutterEngine.dartExecutor.binaryMessenger) { this },
+            )
         pendingRoute = intent?.getStringExtra("open_route") ?: pendingRoute
         media = MediaBridge(this)
         val web = WebBridge(this)
@@ -34,6 +53,17 @@ class MainActivity : FlutterActivity() {
                     val route = pendingRoute
                     pendingRoute = null
                     result.success(route)
+                } else if (call.method == "setNativeCollabCollapsed") {
+                    val collapsed = call.argument<Boolean>("collapsed") ?: false
+                    WebScannerNativeAdFactory.setCollabCollapsed(collapsed)
+                    result.success(null)
+                } else if (call.method == "preloadNativeAds") {
+                    val adUnitId = call.argument<String>("adUnitId").orEmpty()
+                    val fallbackAdUnitId = call.argument<String>("fallbackAdUnitId").orEmpty()
+                    DualAppNativeAdManager.configureAndPreload(this, adUnitId, fallbackAdUnitId)
+                    result.success(DualAppNativeAdManager.cachedCount())
+                } else if (call.method == "getNativeCachedCount") {
+                    result.success(DualAppNativeAdManager.cachedCount())
                 } else if (!settings.handle(call, result) &&
                     !directChat.handle(call, result) && !web.handle(call, result) &&
                     !history.handle(call, result) && !media.handle(call, result)) {
@@ -57,6 +87,11 @@ class MainActivity : FlutterActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (::media.isInitialized && media.onActivityResult(requestCode, resultCode, data)) return
         super.onActivityResult(requestCode, resultCode, data)
+    }
+
+    override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        WebScannerNativeAdFactory.unregisterAll(flutterEngine)
+        super.cleanUpFlutterEngine(flutterEngine)
     }
 
     override fun onDestroy() {

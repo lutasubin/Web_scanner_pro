@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
+import '../../core/ads/ad_service.dart';
+import '../../core/ads/remote_config_service.dart';
+import '../../core/ads/widgets/app_banner_ad.dart';
+import '../../core/di/di.dart';
 import '../../core/widgets/task_feedback.dart';
 import 'direct_chat_controller.dart';
 
@@ -180,9 +184,27 @@ class _DirectChatPageState extends State<DirectChatPage>
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFFF5F6F8),
-    appBar: AppBar(
+  Widget build(BuildContext context) => PopScope(
+    onPopInvokedWithResult: (didPop, _) {
+      if (didPop &&
+          services.isRegistered<AdService>() &&
+          services.isRegistered<RemoteConfigService>()) {
+        services<AdService>().showInterstitial(
+          trigger: 'directChat_back',
+          configOn: services<RemoteConfigService>().interDirectChatBack.value,
+        );
+      }
+    },
+    child: Scaffold(
+      backgroundColor: const Color(0xFFF5F6F8),
+      bottomNavigationBar: services.isRegistered<RemoteConfigService>()
+          ? AppBannerAd(
+              placement: 'direct_chat',
+              enabledFlag:
+                  services<RemoteConfigService>().bannerDirectChatEnabled,
+            )
+          : null,
+      appBar: AppBar(
       backgroundColor: const Color(0xFFF5F6F8),
       title: Text(
         'direct_chat'.tr,
@@ -398,6 +420,7 @@ class _DirectChatPageState extends State<DirectChatPage>
           ),
         ),
       ),
+    ),
     ),
   );
 

@@ -1,5 +1,7 @@
 import 'package:get/get.dart';
 
+import '../../core/ads/ad_service.dart';
+import '../../core/ads/remote_config_service.dart';
 import '../../core/di/di.dart';
 import '../../core/platform/app_platform.dart';
 import '../../core/repositories/preferences_repository.dart';
@@ -49,7 +51,7 @@ class HomeController extends TaskController {
 
   Future<void> openSession(String id) => perform(() async {
     await dismissHandCoachmark();
-    await _platform.invoke<void>('openSession', {'id': id});
+    await _launchWebSessionWithAds(id);
     await _loadSessions();
   });
 
@@ -61,8 +63,28 @@ class HomeController extends TaskController {
     }
     final session = activeSession;
     if (session != null) {
-      await _platform.invoke<void>('openSession', {'id': session.id});
+      await _launchWebSessionWithAds(session.id);
       await _loadSessions();
     }
   });
+
+  Future<void> _launchWebSessionWithAds(String id) async {
+    var bannerEnabled = true;
+    if (services.isRegistered<AdService>() &&
+        services.isRegistered<RemoteConfigService>()) {
+      final adService = services<AdService>();
+      final rc = services<RemoteConfigService>();
+      bannerEnabled =
+          rc.adsGlobalEnabled.value && rc.bannerWebEnabled.value;
+      await adService.showInterstitial(
+        trigger: 'web_into',
+        configOn: rc.interWebInto.value,
+      );
+      adService.markEnteringWebSession();
+    }
+    await _platform.invoke<void>('openSession', {
+      'id': id,
+      'bannerEnabled': bannerEnabled,
+    });
+  }
 }

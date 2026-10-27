@@ -1,0 +1,368 @@
+{
+  "parameters": {
+    "ads_global_enabled": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Công tắc tổng bật/tắt toàn bộ quảng cáo trên ứng dụng (tương đương !unShowAd ở app gốc)",
+      "valueType": "BOOLEAN"
+    },
+    "unShowAd": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "description": "[App Gốc] Công tắc ẩn quảng cáo khi duyệt phiên bản (true = tắt toàn bộ quảng cáo)",
+      "valueType": "BOOLEAN"
+    },
+    "wf_mode": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "description": "[App Gốc] Bật/tắt chế độ Waterfall nhiều tầng giá sàn (L3 -> L2 -> L1)",
+      "valueType": "BOOLEAN"
+    },
+    "splash_ad_style": {
+      "defaultValue": {
+        "value": "1"
+      },
+      "description": "Quảng cáo màn hình Splash (Cold Start): 0 = Tắt, 1 = App Open Ad, 2 = Interstitial Ad",
+      "valueType": "NUMBER"
+    },
+    "splash_style": {
+      "defaultValue": {
+        "value": "1"
+      },
+      "description": "[App Gốc] Đồng bộ với splash_ad_style: 0 = Tắt, 1 = App Open Ad, 2 = Interstitial Ad",
+      "valueType": "NUMBER"
+    },
+    "hot_open_ad_enabled": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Bật/tắt quảng cáo App Open khi người dùng mở lại app từ nền (Hot Start / Resume)",
+      "valueType": "BOOLEAN"
+    },
+    "hot_open_interval_sec": {
+      "defaultValue": {
+        "value": "10"
+      },
+      "description": "Khoảng thời gian chờ tối thiểu (giây) giữa 2 lần hiện Hot Start App Open Ad (mặc định 10s)",
+      "valueType": "NUMBER"
+    },
+    "hot_open_interval": {
+      "defaultValue": {
+        "value": "10"
+      },
+      "description": "[App Gốc] Đồng bộ với hot_open_interval_sec (mặc định 10s)",
+      "valueType": "NUMBER"
+    },
+    "inter_interval_sec": {
+      "defaultValue": {
+        "value": "30"
+      },
+      "description": "Khoảng thời gian chờ tối thiểu (giây) giữa 2 lần hiện Interstitial Ad liên tiếp (mặc định 30s)",
+      "valueType": "NUMBER"
+    },
+    "inter_interval": {
+      "defaultValue": {
+        "value": "30"
+      },
+      "description": "[App Gốc] Đồng bộ với inter_interval_sec (mặc định 30s)",
+      "valueType": "NUMBER"
+    },
+    "native_lang_style": {
+      "defaultValue": {
+        "value": "2"
+      },
+      "description": "Mẫu Native Ad ở đáy màn Chọn Ngôn Ngữ: 0 = Tắt, 1 = Large Media, 2 = Small Solid (chuẩn app gốc), 3 = Small Hollow, 4 = Medium Btn Top, 5 = Medium Btn Bottom, 6 = Native Collab",
+      "valueType": "NUMBER"
+    },
+    "lang_style": {
+      "defaultValue": {
+        "value": "2"
+      },
+      "description": "[App Gốc] Đồng bộ với native_lang_style (mặc định 2 = ad_native_small.xml)",
+      "valueType": "NUMBER"
+    },
+    "native_home_collab_style": {
+      "defaultValue": {
+        "value": "0"
+      },
+      "description": "Mẫu Native Ad ở đáy màn Home: 0 = Dùng Collapsible Banner chuẩn app gốc (mở rộng nửa màn hình có nút mũi tên thu gọn), 1..6 = Dùng Native Template 1..6",
+      "valueType": "NUMBER"
+    },
+    "native_list_style": {
+      "defaultValue": {
+        "value": "2"
+      },
+      "description": "Mẫu Native Ad chèn ở vị trí thứ 2 (index = 1) trong danh sách Deleted Messages & Saved Files: 0 = Tắt, 1..6 = Style 1..6 (mặc định 2)",
+      "valueType": "NUMBER"
+    },
+    "list_style": {
+      "defaultValue": {
+        "value": "2"
+      },
+      "description": "[App Gốc] Đồng bộ với native_list_style (mặc định 2 = ad_native_small.xml)",
+      "valueType": "NUMBER"
+    },
+    "native_exit_style": {
+      "defaultValue": {
+        "value": "2"
+      },
+      "description": "Mẫu Native Ad ở đáy Bottom Sheet xác nhận thoát app ở màn Home: 0 = Tắt, 1..6 = Style 1..6 (mặc định 2 = ad_native_small.xml chuẩn app gốc)",
+      "valueType": "NUMBER"
+    },
+    "exit_style": {
+      "defaultValue": {
+        "value": "2"
+      },
+      "description": "[App Gốc] Đồng bộ với native_exit_style (mặc định 2 = ad_native_small.xml)",
+      "valueType": "NUMBER"
+    },
+    "int_into": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "[App Gốc] Công tắc chung cho phép hiện Interstitial khi đi vào các tính năng",
+      "valueType": "BOOLEAN"
+    },
+    "int_back": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "[App Gốc] Công tắc chung cho phép hiện Interstitial khi bấm Back thoát khỏi các tính năng",
+      "valueType": "BOOLEAN"
+    },
+    "inter_web_into": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Hiện Interstitial khi mở Web Scanner (trigger: web_into)",
+      "valueType": "BOOLEAN"
+    },
+    "inter_web_back": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Hiện Interstitial khi thoát khỏi Web Scanner về app (trigger: web_back)",
+      "valueType": "BOOLEAN"
+    },
+    "inter_status_into": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Hiện Interstitial khi mở Status Saver (trigger: status_into)",
+      "valueType": "BOOLEAN"
+    },
+    "inter_status_back": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Hiện Interstitial khi bấm Back thoát khỏi Status Saver (trigger: status_back)",
+      "valueType": "BOOLEAN"
+    },
+    "inter_history_into": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Hiện Interstitial khi mở Deleted Messages (trigger: sessionList_into)",
+      "valueType": "BOOLEAN"
+    },
+    "inter_history_back": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Hiện Interstitial khi bấm Back thoát khỏi Deleted Messages / Chat Detail (trigger: sessionList_back / session_back)",
+      "valueType": "BOOLEAN"
+    },
+    "inter_direct_chat_into": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Hiện Interstitial khi mở Direct Chat (trigger: directChat_into)",
+      "valueType": "BOOLEAN"
+    },
+    "inter_direct_chat_back": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "description": "Hiện Interstitial khi bấm Back thoát khỏi Direct Chat (trigger: directChat_back)",
+      "valueType": "BOOLEAN"
+    },
+    "inter_files_into": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Hiện Interstitial khi mở Saved Files / Downloads (trigger: downloads_into)",
+      "valueType": "BOOLEAN"
+    },
+    "inter_files_back": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Hiện Interstitial khi bấm Back thoát khỏi Saved Files / Downloads (trigger: downloads_back)",
+      "valueType": "BOOLEAN"
+    },
+    "banner_home_enabled": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Hiện Adaptive Banner ở đáy màn hình chính (HomePage)",
+      "valueType": "BOOLEAN"
+    },
+    "banner_home_collapsible": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Sử dụng Collapsible Banner (mở rộng nửa màn hình có nút mũi tên thu gọn xuống banner) ở đáy màn hình chính",
+      "valueType": "BOOLEAN"
+    },
+    "banner_settings_enabled": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Hiện Adaptive Banner ở đáy màn hình Setting (placement: settings_page)",
+      "valueType": "BOOLEAN"
+    },
+    "banner_settings_collapsible": {
+      "defaultValue": {
+        "value": "false"
+      },
+      "description": "Sử dụng Collapsible Banner ở đáy màn hình Setting",
+      "valueType": "BOOLEAN"
+    },
+    "banner_web_enabled": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Hiện Adaptive Banner ở đáy màn hình WebSessionActivity (placement: web_page)",
+      "valueType": "BOOLEAN"
+    },
+    "banner_status_enabled": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Hiện Adaptive Banner ở đáy màn hình Status Saver (placement: status_page)",
+      "valueType": "BOOLEAN"
+    },
+    "banner_history_enabled": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Hiện Adaptive Banner ở đáy màn hình Deleted Messages & Chi tiết tin nhắn (placement: chat_list / messages_page)",
+      "valueType": "BOOLEAN"
+    },
+    "banner_files_enabled": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Hiện Adaptive Banner ở đáy màn hình Downloads / Saved Files & Deleted Media (placement: media_list)",
+      "valueType": "BOOLEAN"
+    },
+    "banner_direct_chat_enabled": {
+      "defaultValue": {
+        "value": "true"
+      },
+      "description": "Hiện Adaptive Banner ở đáy màn hình Direct Chat (placement: direct_chat)",
+      "valueType": "BOOLEAN"
+    },
+    "ad_unit_app_open_android": {
+      "defaultValue": {
+        "value": "ca-app-pub-3940256099942544/9257395921"
+      },
+      "description": "Ad Unit ID cho App Open Ad trên Android (để trống nếu muốn tắt)",
+      "valueType": "STRING"
+    },
+    "ad_unit_app_open_ios": {
+      "defaultValue": {
+        "value": "ca-app-pub-3940256099942544/5575463023"
+      },
+      "description": "Ad Unit ID cho App Open Ad trên iOS",
+      "valueType": "STRING"
+    },
+    "ad_unit_interstitial_android": {
+      "defaultValue": {
+        "value": "ca-app-pub-3940256099942544/1033173712"
+      },
+      "description": "Ad Unit ID cho Interstitial Ad trên Android (để trống nếu muốn tắt)",
+      "valueType": "STRING"
+    },
+    "ad_unit_interstitial_ios": {
+      "defaultValue": {
+        "value": "ca-app-pub-3940256099942544/4411468910"
+      },
+      "description": "Ad Unit ID cho Interstitial Ad trên iOS",
+      "valueType": "STRING"
+    },
+    "ad_unit_banner_android": {
+      "defaultValue": {
+        "value": "ca-app-pub-3940256099942544/9214589741"
+      },
+      "description": "Ad Unit ID cho Adaptive Banner trên Android (Home, Web, Status, History, Files, DirectChat)",
+      "valueType": "STRING"
+    },
+    "ad_unit_banner_ios": {
+      "defaultValue": {
+        "value": "ca-app-pub-3940256099942544/2435281174"
+      },
+      "description": "Ad Unit ID cho Adaptive Banner trên iOS",
+      "valueType": "STRING"
+    },
+    "ad_unit_banner_collapsible_android": {
+      "defaultValue": {
+        "value": "ca-app-pub-3940256099942544/2014213617"
+      },
+      "description": "Ad Unit ID cho Collapsible Banner trên Android",
+      "valueType": "STRING"
+    },
+    "ad_unit_banner_collapsible_ios": {
+      "defaultValue": {
+        "value": "ca-app-pub-3940256099942544/8388050270"
+      },
+      "description": "Ad Unit ID cho Collapsible Banner trên iOS",
+      "valueType": "STRING"
+    },
+    "ad_unit_native_android": {
+      "defaultValue": {
+        "value": "/21775744923/example/native-video"
+      },
+      "description": "Ad Unit ID chính cho Native Ad trên Android (Language, List index=1, Exit Dialog). Có thể đổi sang ca-app-pub-xxx/yyy bất kỳ lúc nào",
+      "valueType": "STRING"
+    },
+    "ad_unit_native_fallback_android": {
+      "defaultValue": {
+        "value": "/21775744923/example/native"
+      },
+      "description": "Ad Unit ID dự phòng (fallback) cho Native Ad trên Android khi mã chính không fill",
+      "valueType": "STRING"
+    },
+    "ad_unit_native_ios": {
+      "defaultValue": {
+        "value": "/21775744923/example/native-video"
+      },
+      "description": "Ad Unit ID chính cho Native Ad trên iOS",
+      "valueType": "STRING"
+    },
+    "ad_unit_native_fallback_ios": {
+      "defaultValue": {
+        "value": "ca-app-pub-3940256099942544/3986624511"
+      },
+      "description": "Ad Unit ID dự phòng (fallback) cho Native Ad trên iOS",
+      "valueType": "STRING"
+    },
+    "ad_unit_native_collab_android": {
+      "defaultValue": {
+        "value": "/21775744923/example/native-video"
+      },
+      "description": "Ad Unit ID riêng cho Native Collab (Style 6 - Thu gọn/Mở rộng) trên Android. Để trống sẽ dùng ad_unit_native_android",
+      "valueType": "STRING"
+    },
+    "ad_unit_native_collab_ios": {
+      "defaultValue": {
+        "value": "/21775744923/example/native-video"
+      },
+      "description": "Ad Unit ID riêng cho Native Collab (Style 6 - Thu gọn/Mở rộng) trên iOS",
+      "valueType": "STRING"
+    }
+  }
+}

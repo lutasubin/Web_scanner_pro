@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../core/ads/remote_config_service.dart';
+import '../../core/ads/widgets/app_native_ad.dart';
+import '../../core/di/di.dart';
 import 'history_controller.dart';
 import 'history_conversation_page.dart';
 import 'history_message.dart';
@@ -50,16 +53,18 @@ class HistoryList extends StatelessWidget {
       );
     }
 
-    return Column(
-      children: allItems.map((conv) {
-        final isSample =
-            conv.packageName == HistoryController.samplePackage &&
-            conv.title == HistoryController.sampleTitle;
-        final inSelection = controller.selectionMode.value;
-        final selected = controller.selectedKeys.contains(
-          controller.keyFor(conv),
-        );
-        return _ConversationTile(
+    final rows = <Widget>[];
+    for (var i = 0; i < allItems.length; i++) {
+      final conv = allItems[i];
+      final isSample =
+          conv.packageName == HistoryController.samplePackage &&
+          conv.title == HistoryController.sampleTitle;
+      final inSelection = controller.selectionMode.value;
+      final selected = controller.selectedKeys.contains(
+        controller.keyFor(conv),
+      );
+      rows.add(
+        _ConversationTile(
           conversation: conv,
           isSample: isSample,
           selectionMode: inSelection,
@@ -81,9 +86,25 @@ class HistoryList extends StatelessWidget {
             );
           },
           onLongPress: () => controller.toggleConversationSelection(conv),
+        ),
+      );
+
+      // Mirrors `pc/a0.java` (`arrayList.add(1, new c0("<native_ad>", ...))`):
+      // Insert Native Ad at index 1 (immediately after the 1st conversation item).
+      if (i == 0 && services.isRegistered<RemoteConfigService>()) {
+        rows.add(
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: AppNativeAd(
+              placement: 'chat_list',
+              styleRx: services<RemoteConfigService>().nativeListStyle,
+            ),
+          ),
         );
-      }).toList(),
-    );
+      }
+    }
+
+    return Column(children: rows);
   });
 }
 

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../core/ads/ad_service.dart';
+import '../../core/ads/remote_config_service.dart';
+import '../../core/ads/widgets/app_banner_ad.dart';
 import '../../core/di/di.dart';
 import '../../core/repositories/preferences_repository.dart';
 import '../../core/widgets/confirm_action.dart';
@@ -92,9 +95,27 @@ class _HistoryPageState extends State<HistoryPage> with WidgetsBindingObserver {
     final inSelection = c.selectionMode.value;
     final hasAccess = c.access.value;
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F6F8),
-      appBar: AppBar(
+    return PopScope(
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop &&
+            services.isRegistered<AdService>() &&
+            services.isRegistered<RemoteConfigService>()) {
+          services<AdService>().showInterstitial(
+            trigger: 'sessionList_back',
+            configOn: services<RemoteConfigService>().interHistoryBack.value,
+          );
+        }
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF5F6F8),
+        bottomNavigationBar: services.isRegistered<RemoteConfigService>()
+            ? AppBannerAd(
+                placement: 'chat_list',
+                enabledFlag:
+                    services<RemoteConfigService>().bannerHistoryEnabled,
+              )
+            : null,
+        appBar: AppBar(
         backgroundColor: const Color(0xFFF5F6F8),
         title: Text(
           inSelection
@@ -264,6 +285,7 @@ class _HistoryPageState extends State<HistoryPage> with WidgetsBindingObserver {
           ),
         ),
       ),
+    ),
     );
   });
 }

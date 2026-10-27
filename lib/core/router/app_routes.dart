@@ -12,4 +12,5 @@ class AppRoutes {
   static const howToUse = '/how-to-use';
   static const guideNotify = '/guide-notify';
   static const guideStorage = '/guide-storage';
+  static const adsDebug = '/ads-debug';
 }
