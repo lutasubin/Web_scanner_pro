@@ -1,47 +1,88 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../core/widgets/empty_state.dart';
 import 'history_controller.dart';
 import 'history_conversation_page.dart';
 import 'history_message.dart';
 
 class HistoryList extends StatelessWidget {
-  const HistoryList({super.key, required this.controller});
+  const HistoryList({
+    super.key,
+    required this.controller,
+    this.onOpenGuide,
+  });
+
   final HistoryController controller;
+  final VoidCallback? onOpenGuide;
 
   @override
   Widget build(BuildContext context) => Obx(() {
-    final list = controller.conversations;
-    if (list.isEmpty) {
-      return EmptyState(
-        icon: Icons.mark_chat_unread_outlined,
-        title: controller.searchQuery.value.isNotEmpty
-            ? 'Không tìm thấy cuộc trò chuyện phù hợp'
-            : 'Chưa có tin nhắn hoặc thông báo nào được lưu',
-        description:
-            'Bật công tắc ghi thông báo và cấp quyền Notification Access. Khi đối phương gửi rồi thu hồi tin nhắn, nội dung vẫn được giữ lại tại đây.',
+    final realList = controller.conversations;
+    final showSample = !controller.sampleDismissed.value;
+    final allItems = <HistoryConversation>[
+      ...realList,
+      if (showSample) controller.sampleConversation,
+    ];
+
+    if (allItems.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
+        child: Column(
+          children: [
+            Image.asset(
+              'assets/images/no_content.webp',
+              width: 120,
+              height: 120,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'No deleted messages yet',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF6B7870),
+              ),
+            ),
+          ],
+        ),
       );
     }
+
     return Column(
-      children: list
-          .map(
-            (conv) => _ConversationTile(
-              conversation: conv,
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => HistoryConversationPage(
-                    title: conv.title,
-                    packageName: conv.packageName,
-                    controller: controller,
-                  ),
+      children: allItems.map((conv) {
+        final isSample =
+            conv.packageName == HistoryController.samplePackage &&
+            conv.title == HistoryController.sampleTitle;
+        final inSelection = controller.selectionMode.value;
+        final selected = controller.selectedKeys.contains(
+          controller.keyFor(conv),
+        );
+        return _ConversationTile(
+          conversation: conv,
+          isSample: isSample,
+          selectionMode: inSelection,
+          selected: selected,
+          onTap: () {
+            if (inSelection) {
+              controller.toggleConversationSelection(conv);
+              return;
+            }
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => HistoryConversationPage(
+                  title: conv.title,
+                  packageName: conv.packageName,
+                  controller: controller,
+                  onOpenGuide: onOpenGuide,
                 ),
               ),
-              onDelete: () =>
-                  controller.deleteConversation(conv.title, conv.packageName),
-            ),
-          )
-          .toList(),
+            );
+          },
+          onLongPress: () => controller.toggleConversationSelection(conv),
+        );
+      }).toList(),
     );
   });
 }
@@ -49,13 +90,19 @@ class HistoryList extends StatelessWidget {
 class _ConversationTile extends StatelessWidget {
   const _ConversationTile({
     required this.conversation,
+    required this.isSample,
+    required this.selectionMode,
+    required this.selected,
     required this.onTap,
-    required this.onDelete,
+    required this.onLongPress,
   });
 
   final HistoryConversation conversation;
+  final bool isSample;
+  final bool selectionMode;
+  final bool selected;
   final VoidCallback onTap;
-  final VoidCallback onDelete;
+  final VoidCallback onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -67,30 +114,85 @@ class _ConversationTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Card(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(
+            color: selected ? const Color(0xFF08C567) : Colors.transparent,
+            width: selected ? 2 : 1,
+          ),
+        ),
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
           onTap: onTap,
+          onLongPress: onLongPress,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             child: Row(
               children: [
-                CircleAvatar(
-                  radius: 23,
-                  backgroundColor: conversation.isBusiness
-                      ? const Color(0xFFE3F2FD)
-                      : const Color(0xFFE7FAF0),
-                  child: Text(
-                    initial,
-                    style: TextStyle(
-                      color: conversation.isBusiness
-                          ? const Color(0xFF1565C0)
-                          : const Color(0xFF008A5E),
-                      fontWeight: FontWeight.w800,
-                      fontSize: 17,
-                    ),
-                  ),
+                // Avatar with red unread count badge matching `orig_ad_closed.png`
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    if (isSample)
+                      Container(
+                        width: 46,
+                        height: 46,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFE7FAF0),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.notifications_rounded,
+                          color: Color(0xFF08C567),
+                          size: 26,
+                        ),
+                      )
+                    else
+                      CircleAvatar(
+                        radius: 23,
+                        backgroundColor: conversation.isBusiness
+                            ? const Color(0xFFE3F2FD)
+                            : const Color(0xFFE7FAF0),
+                        child: Text(
+                          initial,
+                          style: TextStyle(
+                            color: conversation.isBusiness
+                                ? const Color(0xFF1565C0)
+                                : const Color(0xFF08C567),
+                            fontWeight: FontWeight.w800,
+                            fontSize: 17,
+                          ),
+                        ),
+                      ),
+                    if (conversation.count > 0)
+                      Positioned(
+                        right: -2,
+                        top: -2,
+                        child: Container(
+                          constraints: const BoxConstraints(
+                            minWidth: 19,
+                            minHeight: 19,
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFF3B30),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.white, width: 1.5),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            '${conversation.count}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -103,89 +205,43 @@ class _ConversationTile extends StatelessWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w800,
                                 fontSize: 15.5,
+                                color: Color(0xFF1C1F1D),
                               ),
                             ),
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            latest.formattedTime,
+                            isSample ? 'Now' : latest.formattedTime,
                             style: const TextStyle(
                               fontSize: 12,
-                              color: Color(0xFF6B7870),
+                              color: Color(0xFF8C9690),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 5),
                       Text(
                         latest.body,
-                        maxLines: 2,
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 13.5,
-                          color: Color(0xFF49564E),
+                          color: Color(0xFF6B7870),
                         ),
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 7,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: conversation.isBusiness
-                                  ? const Color(0xFFE3F2FD)
-                                  : const Color(0xFFEAF7F0),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              conversation.source,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: conversation.isBusiness
-                                    ? const Color(0xFF1565C0)
-                                    : const Color(0xFF008A5E),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 7,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF1F4F2),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              '${conversation.count} tin nhắn',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF56635C),
-                              ),
-                            ),
-                          ),
-                        ],
                       ),
                     ],
                   ),
                 ),
-                IconButton(
-                  tooltip: 'Xóa cuộc trò chuyện',
-                  onPressed: onDelete,
-                  icon: const Icon(
-                    Icons.delete_outline_rounded,
-                    size: 20,
-                    color: Color(0xFF8C9690),
+                if (selectionMode) ...[
+                  const SizedBox(width: 8),
+                  Checkbox(
+                    value: selected,
+                    onChanged: (_) => onTap(),
+                    activeColor: const Color(0xFF08C567),
                   ),
-                ),
+                ],
               ],
             ),
           ),

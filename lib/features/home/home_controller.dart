@@ -47,6 +47,12 @@ class HomeController extends TaskController {
     }
   }
 
+  Future<void> openSession(String id) => perform(() async {
+    await dismissHandCoachmark();
+    await _platform.invoke<void>('openSession', {'id': id});
+    await _loadSessions();
+  });
+
   Future<void> openActive() => perform(() async {
     await dismissHandCoachmark();
     if (sessions.isEmpty) {

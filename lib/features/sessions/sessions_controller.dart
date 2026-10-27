@@ -9,6 +9,7 @@ class SessionsController extends TaskController {
   final AppPlatform _platform;
   final multiProfile = false.obs;
   final sessions = <WebSession>[].obs;
+  final reorderMode = false.obs;
 
   Future<void> load() async => perform(() async {
     final map = await _platform.readMap('getCapabilities');
@@ -23,6 +24,28 @@ class SessionsController extends TaskController {
   }
 
   bool get canCreate => sessions.isEmpty || multiProfile.value;
+
+  void toggleReorderMode() => reorderMode.value = !reorderMode.value;
+
+  Future<void> reorder(int oldIndex, int newIndex) async {
+    if (newIndex > oldIndex) newIndex -= 1;
+    if (oldIndex == newIndex ||
+        oldIndex < 0 ||
+        oldIndex >= sessions.length ||
+        newIndex < 0 ||
+        newIndex >= sessions.length) {
+      return;
+    }
+    final moved = sessions.removeAt(oldIndex);
+    sessions.insert(newIndex, moved);
+    try {
+      await _platform.invoke<void>('reorderSessions', {
+        'ids': sessions.map((s) => s.id).toList(),
+      });
+    } catch (_) {
+      await _loadSessions();
+    }
+  }
 
   Future<void> open(String id) =>
       perform(() => _platform.invoke<void>('openSession', {'id': id}));

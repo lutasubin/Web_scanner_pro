@@ -12,11 +12,17 @@ class HistoryConversationPage extends StatelessWidget {
     required this.title,
     required this.packageName,
     required this.controller,
+    this.onOpenGuide,
   });
 
   final String title;
   final String packageName;
   final HistoryController controller;
+  final VoidCallback? onOpenGuide;
+
+  bool get _isSample =>
+      packageName == HistoryController.samplePackage &&
+      title == HistoryController.sampleTitle;
 
   Future<void> _confirmDeleteChat(BuildContext context) async {
     if (await confirmAction(
@@ -52,13 +58,21 @@ class HistoryConversationPage extends StatelessWidget {
             CircleAvatar(
               radius: 18,
               backgroundColor: const Color(0xFFE7FAF0),
-              child: Text(
-                title.isNotEmpty ? title.characters.first.toUpperCase() : 'W',
-                style: const TextStyle(
-                  color: Color(0xFF008A5E),
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
+              child: _isSample
+                  ? const Icon(
+                      Icons.notifications_rounded,
+                      color: Color(0xFF08C567),
+                      size: 20,
+                    )
+                  : Text(
+                      title.isNotEmpty
+                          ? title.characters.first.toUpperCase()
+                          : 'W',
+                      style: const TextStyle(
+                        color: Color(0xFF008A5E),
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -75,7 +89,9 @@ class HistoryConversationPage extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    isBusiness ? 'WhatsApp Business' : 'WhatsApp',
+                    _isSample
+                        ? 'System Guide'
+                        : (isBusiness ? 'WhatsApp Business' : 'WhatsApp'),
                     style: const TextStyle(
                       fontSize: 11.5,
                       color: Color(0xFF5A6860),
@@ -104,37 +120,46 @@ class HistoryConversationPage extends StatelessWidget {
           }
           return Column(
             children: [
-              Container(
-                width: double.infinity,
-                margin: const EdgeInsets.fromLTRB(16, 10, 16, 4),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF8E7),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Text(
-                  '💡 Chạm vào bong bóng tin nhắn để sao chép hoặc xóa từng tin.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 12.5, color: Color(0xFF5A4E2D)),
-                ),
-              ),
               Expanded(
                 child: ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 24),
+                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 24),
                   itemCount: items.length,
                   itemBuilder: (context, index) {
                     final msg = items[index];
                     return _MessageBubble(
                       message: msg,
+                      showDelete: !_isSample,
                       onCopy: () => _copyText(context, msg.body),
                       onDelete: () => controller.deleteMessage(msg.id),
                     );
                   },
                 ),
               ),
+              if (_isSample && onOpenGuide != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF08C567),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: onOpenGuide,
+                      child: const Text(
+                        'View the Guide',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
             ],
           );
         }),
@@ -146,11 +171,13 @@ class HistoryConversationPage extends StatelessWidget {
 class _MessageBubble extends StatelessWidget {
   const _MessageBubble({
     required this.message,
+    required this.showDelete,
     required this.onCopy,
     required this.onDelete,
   });
 
   final HistoryMessage message;
+  final bool showDelete;
   final VoidCallback onCopy;
   final VoidCallback onDelete;
 
@@ -216,18 +243,23 @@ class _MessageBubble extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 4),
-                  InkWell(
-                    onTap: onDelete,
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                      child: Icon(
-                        Icons.delete_outline_rounded,
-                        size: 15,
-                        color: Color(0xFFD32F2F),
+                  if (showDelete) ...[
+                    const SizedBox(width: 4),
+                    InkWell(
+                      onTap: onDelete,
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 4,
+                          vertical: 2,
+                        ),
+                        child: Icon(
+                          Icons.delete_outline_rounded,
+                          size: 15,
+                          color: Color(0xFFD32F2F),
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ],
               ),
             ],

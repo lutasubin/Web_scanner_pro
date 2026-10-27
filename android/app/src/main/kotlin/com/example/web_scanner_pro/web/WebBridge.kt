@@ -25,6 +25,12 @@ class WebBridge(private val activity: Activity) {
                 result,
             )
         }
+        if (call.method == "reorderSessions") {
+            val ids = call.argument<List<String>>("ids").orEmpty()
+            store.reorder(ids)
+            result.success(null)
+            return true
+        }
         if (call.method !in setOf("openSession", "resetSession", "deleteSession")) return false
         val id = call.argument<String>("id").orEmpty()
         if (store.find(id) == null) {

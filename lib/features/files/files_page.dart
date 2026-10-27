@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../core/constants/app_copy.dart';
 import '../../core/models/media_record.dart';
 import '../../core/widgets/confirm_action.dart';
-import '../../core/widgets/empty_state.dart';
-import '../../core/widgets/info_card.dart';
 import '../../core/widgets/media_preview.dart';
 import '../../core/widgets/task_feedback.dart';
 import 'files_controller.dart';
@@ -19,10 +16,37 @@ class FilesPage extends StatefulWidget {
 class _FilesPageState extends State<FilesPage> with WidgetsBindingObserver {
   late final c = Get.find<FilesController>();
 
+  // Maps the 3 original tabs (`Images` | `Videos` | `Documents`) to FilesController category (1, 2, 4)
+  int get _activeTabIndex {
+    switch (c.category.value) {
+      case 2:
+        return 1;
+      case 4:
+        return 2;
+      default:
+        return 0;
+    }
+  }
+
+  void _selectTab(int tabIdx) {
+    c.clearSelection();
+    switch (tabIdx) {
+      case 0:
+        c.setCategory(1); // Images
+      case 1:
+        c.setCategory(2); // Videos
+      case 2:
+        c.setCategory(4); // Documents
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    if (c.category.value == 0) {
+      c.setCategory(1); // Default to Images tab like original app
+    }
     c.load();
   }
 
@@ -40,20 +64,21 @@ class _FilesPageState extends State<FilesPage> with WidgetsBindingObserver {
   Future<void> _delete(MediaRecord file) async {
     if (await confirmAction(
       context,
-      title: 'Xóa bản tải?',
-      message: 'Tệp "${file.name}" sẽ bị xóa khỏi Downloads/WebScannerPro.',
-      confirmLabel: 'Xóa',
+      title: 'Delete file?',
+      message: '"${file.name}" will be removed from Downloads.',
+      confirmLabel: 'Delete',
     )) {
       await c.delete(file);
     }
   }
 
   Future<void> _deleteSelected() async {
+    if (c.selectedIds.isEmpty) return;
     if (await confirmAction(
       context,
-      title: 'Xóa ${c.selectedIds.length} tệp đã chọn?',
-      message: 'Các tệp đã chọn sẽ bị xóa khỏi Downloads/WebScannerPro.',
-      confirmLabel: 'Xóa tất cả',
+      title: 'Delete ${c.selectedIds.length} selected files?',
+      message: 'Selected files will be removed from Downloads.',
+      confirmLabel: 'Delete',
     )) {
       await c.deleteSelected();
     }
@@ -78,33 +103,52 @@ class _FilesPageState extends State<FilesPage> with WidgetsBindingObserver {
     }
   }
 
+  void _toggleSelectionMode() {
+    if (c.selectionMode.value) {
+      c.clearSelection();
+    } else {
+      c.selectionMode.value = true;
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Obx(() {
     final inSelection = c.selectionMode.value;
-    final list = c.filteredItems;
+    final tabIdx = _activeTabIndex;
+    final list = tabIdx == 0
+        ? c.items.where((e) => e.isImage).toList(growable: false)
+        : tabIdx == 1
+        ? c.items.where((e) => e.isVideo).toList(growable: false)
+        : c.items
+              .where((e) => !e.isImage && !e.isVideo)
+              .toList(growable: false);
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F6F8),
       appBar: AppBar(
+        backgroundColor: Colors.white,
         title: Text(
-          inSelection ? 'Đã chọn ${c.selectedIds.length} tệp' : AppCopy.files,
+          inSelection ? 'Selected (${c.selectedIds.length})' : 'downloads'.tr,
+          style: const TextStyle(fontWeight: FontWeight.w800),
         ),
         actions: [
           if (inSelection) ...[
             IconButton(
-              tooltip: 'Chọn tất cả',
+              tooltip: 'Select all',
               onPressed: c.selectAllCurrent,
               icon: const Icon(Icons.select_all_rounded),
             ),
             IconButton(
-              tooltip: 'Bỏ chọn',
+              tooltip: 'Cancel',
               onPressed: c.clearSelection,
               icon: const Icon(Icons.close_rounded),
             ),
           ] else
             IconButton(
-              onPressed: c.load,
-              tooltip: 'Tải lại',
-              icon: const Icon(Icons.refresh_rounded),
+              key: const Key('downloads-multi-select'),
+              onPressed: _toggleSelectionMode,
+              tooltip: 'Select',
+              icon: const Icon(Icons.check_box_outlined),
             ),
         ],
       ),
@@ -114,50 +158,39 @@ class _FilesPageState extends State<FilesPage> with WidgetsBindingObserver {
             constraints: const BoxConstraints(maxWidth: 680),
             child: Column(
               children: [
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(16, 6, 16, 8),
-                  child: InfoCard(text: AppCopy.filesNote),
-                ),
-
-                // Category Chips
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                // 3-Tab Underline TabBar (`Images` | `Videos` | `Documents`) matching `orig_downloaded_screen.png`
+                Container(
+                  color: Colors.white,
                   child: Row(
                     children: [
-                      _CategoryChip(
-                        label: 'Tất cả (${c.items.length})',
-                        selected: c.category.value == 0,
-                        onTap: () => c.setCategory(0),
+                      Expanded(
+                        child: _DownloadUnderlineTab(
+                          key: const Key('tab-downloads-images'),
+                          label: 'Images',
+                          selected: tabIdx == 0,
+                          onTap: () => _selectTab(0),
+                        ),
                       ),
-                      const SizedBox(width: 8),
-                      _CategoryChip(
-                        label: 'Ảnh',
-                        selected: c.category.value == 1,
-                        onTap: () => c.setCategory(1),
+                      Expanded(
+                        child: _DownloadUnderlineTab(
+                          key: const Key('tab-downloads-videos'),
+                          label: 'Videos',
+                          selected: tabIdx == 1,
+                          onTap: () => _selectTab(1),
+                        ),
                       ),
-                      const SizedBox(width: 8),
-                      _CategoryChip(
-                        label: 'Video',
-                        selected: c.category.value == 2,
-                        onTap: () => c.setCategory(2),
-                      ),
-                      const SizedBox(width: 8),
-                      _CategoryChip(
-                        label: 'Âm thanh',
-                        selected: c.category.value == 3,
-                        onTap: () => c.setCategory(3),
-                      ),
-                      const SizedBox(width: 8),
-                      _CategoryChip(
-                        label: 'Tài liệu',
-                        selected: c.category.value == 4,
-                        onTap: () => c.setCategory(4),
+                      Expanded(
+                        child: _DownloadUnderlineTab(
+                          key: const Key('tab-downloads-documents'),
+                          label: 'Documents',
+                          selected: tabIdx == 2,
+                          onTap: () => _selectTab(2),
+                        ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 6),
+                const Divider(height: 1, color: Color(0xFFE7EAE8)),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: TaskFeedback(controller: c, onRetry: c.load),
@@ -165,17 +198,34 @@ class _FilesPageState extends State<FilesPage> with WidgetsBindingObserver {
 
                 Expanded(
                   child: list.isEmpty
-                      ? const SingleChildScrollView(
-                          padding: EdgeInsets.all(20),
-                          child: EmptyState(
-                            icon: Icons.folder_open_rounded,
-                            title: 'Chưa có tệp trong danh mục này',
-                            description:
-                                'Trạng thái đã lưu và tệp tải xuống từ phiên WhatsApp Web sẽ xuất hiện tại đây.',
+                      ? Center(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.all(28),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Image.asset(
+                                  'assets/images/no_content.webp',
+                                  width: 132,
+                                  height: 132,
+                                  fit: BoxFit.contain,
+                                ),
+                                const SizedBox(height: 14),
+                                const Text(
+                                  'No downloaded files yet',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF6B7870),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         )
                       : ListView.builder(
-                          padding: const EdgeInsets.fromLTRB(16, 6, 16, 20),
+                          padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
                           itemCount: list.length,
                           itemBuilder: (context, index) {
                             final file = list[index];
@@ -218,9 +268,11 @@ class _FilesPageState extends State<FilesPage> with WidgetsBindingObserver {
                     child: SizedBox(
                       width: double.infinity,
                       child: FilledButton.tonalIcon(
-                        onPressed: _deleteSelected,
+                        onPressed: c.selectedIds.isEmpty
+                            ? null
+                            : _deleteSelected,
                         icon: const Icon(Icons.delete_outline_rounded),
-                        label: Text('Xóa đã chọn (${c.selectedIds.length})'),
+                        label: Text('Delete (${c.selectedIds.length})'),
                       ),
                     ),
                   ),
@@ -233,8 +285,9 @@ class _FilesPageState extends State<FilesPage> with WidgetsBindingObserver {
   });
 }
 
-class _CategoryChip extends StatelessWidget {
-  const _CategoryChip({
+class _DownloadUnderlineTab extends StatelessWidget {
+  const _DownloadUnderlineTab({
+    super.key,
     required this.label,
     required this.selected,
     required this.onTap,
@@ -245,11 +298,35 @@ class _CategoryChip extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => ChoiceChip(
-    label: Text(label),
-    selected: selected,
-    onSelected: (_) => onTap(),
-    visualDensity: VisualDensity.compact,
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+              color: selected
+                  ? const Color(0xFF1C1F1D)
+                  : const Color(0xFF8C9690),
+            ),
+          ),
+        ),
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          height: 3,
+          width: 48,
+          decoration: BoxDecoration(
+            color: selected ? const Color(0xFF08C567) : Colors.transparent,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+      ],
+    ),
   );
 }
 
@@ -277,10 +354,10 @@ class _FileRowCard extends StatelessWidget {
     final typeLabel = file.isVideo
         ? 'Video'
         : file.isImage
-        ? 'Ảnh'
+        ? 'Image'
         : file.isAudio
-        ? 'Âm thanh'
-        : 'Tài liệu';
+        ? 'Audio'
+        : 'Document';
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -342,12 +419,12 @@ class _FileRowCard extends StatelessWidget {
                   )
                 else ...[
                   IconButton(
-                    tooltip: 'Chia sẻ',
+                    tooltip: 'Share',
                     onPressed: onShare,
                     icon: const Icon(Icons.share_outlined, size: 20),
                   ),
                   IconButton(
-                    tooltip: 'Xóa',
+                    tooltip: 'Delete',
                     onPressed: onDelete,
                     icon: const Icon(
                       Icons.delete_outline_rounded,

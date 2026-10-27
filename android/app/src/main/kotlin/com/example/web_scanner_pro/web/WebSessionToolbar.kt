@@ -293,11 +293,9 @@ class WebSessionToolbar(
     }
 
     /**
-     * Matches `popup_more_actions.xml` in the original app:
-     * 1. Chuyển chế độ (Switch Mode: Advanced vs Basic)
-     * 2. Chế độ tối / Chế độ sáng (Dark / Light mode)
-     * 3. Hướng dẫn liên kết (Help)
-     * 4. Đóng phiên Web
+     * Matches `popup_more_actions.xml` in the original app (`orig_logged_in.png`):
+     * 1. Switch Mode (Advanced vs Basic)
+     * 2. Dark Mode / Light Mode
      */
     private fun showMore(anchor: View) {
         lateinit var popup: PopupWindow
@@ -310,7 +308,7 @@ class WebSessionToolbar(
         fun itemRow(symbol: String, title: String, click: () -> Unit): View =
             LinearLayout(activity).apply {
                 gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(14), dp(11), dp(16), dp(11))
+                setPadding(dp(14), dp(12), dp(16), dp(12))
                 background = selectableBackground()
                 setOnClickListener {
                     popup.dismiss()
@@ -319,7 +317,9 @@ class WebSessionToolbar(
                 addView(
                     TextView(activity).apply {
                         text = symbol
-                        textSize = 16f
+                        textSize = 16.5f
+                        setTextColor(TEXT)
+                        typeface = Typeface.DEFAULT_BOLD
                         gravity = Gravity.CENTER
                     },
                     LinearLayout.LayoutParams(dp(26), ViewGroup.LayoutParams.WRAP_CONTENT),
@@ -334,24 +334,29 @@ class WebSessionToolbar(
                     LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.WRAP_CONTENT,
                         ViewGroup.LayoutParams.WRAP_CONTENT,
-                    ).apply { marginStart = dp(8) },
+                    ).apply { marginStart = dp(10) },
                 )
             }
 
-        panel.addView(itemRow("📱", "Chuyển chế độ", onShowModeDialog))
+        panel.addView(itemRow("⇄", "Chuyển chế độ", onShowModeDialog))
+        panel.addView(
+            View(activity).apply { setBackgroundColor(DIVIDER) },
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1)).apply {
+                marginStart = dp(10)
+                marginEnd = dp(10)
+            },
+        )
         panel.addView(
             itemRow(
-                if (isDarkMode) "☀️" else "🌙",
+                if (isDarkMode) "☀" else "☾",
                 if (isDarkMode) "Chế độ sáng" else "Chế độ tối",
                 onToggleDarkMode,
             ),
         )
-        panel.addView(itemRow("❓", "Hướng dẫn sử dụng", onHelp))
-        panel.addView(itemRow("🚪", "Đóng phiên Web", onClose))
 
         popup = PopupWindow(
             panel,
-            dp(215),
+            dp(196),
             ViewGroup.LayoutParams.WRAP_CONTENT,
             true,
         ).apply {
@@ -359,7 +364,7 @@ class WebSessionToolbar(
             elevation = dp(8).toFloat()
             setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
         }
-        popup.showAsDropDown(anchor, -dp(120), dp(4))
+        popup.showAsDropDown(anchor, -dp(135), dp(4))
     }
 
     private fun textBadgeAction(label: String, description: String, listener: () -> Unit) =

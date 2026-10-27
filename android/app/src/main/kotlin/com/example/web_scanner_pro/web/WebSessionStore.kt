@@ -57,6 +57,18 @@ class WebSessionStore(context: Context) {
         return true
     }
 
+    fun reorder(orderedIds: List<String>): Boolean {
+        val current = list()
+        if (current.isEmpty()) return false
+        val byId = current.associateBy { it.id }
+        val reordered = buildList {
+            orderedIds.forEach { id -> byId[id]?.let(::add) }
+            current.forEach { item -> if (none { it.id == item.id }) add(item) }
+        }
+        save(reordered)
+        return true
+    }
+
     fun remove(id: String): Boolean {
         val current = list()
         val updated = current.filterNot { it.id == id }

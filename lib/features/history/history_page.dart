@@ -1,14 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../core/constants/app_copy.dart';
 import '../../core/di/di.dart';
 import '../../core/repositories/preferences_repository.dart';
-import '../../core/widgets/app_scaffold.dart';
 import '../../core/widgets/confirm_action.dart';
 import '../../core/widgets/task_feedback.dart';
 import '../onboarding/feature_permission_onboarding.dart';
-import 'history_access_card.dart';
+import 'deleted_media_page.dart';
 import 'history_controller.dart';
 import 'history_list.dart';
 
@@ -18,14 +16,25 @@ class HistoryPage extends StatefulWidget {
   State<HistoryPage> createState() => _HistoryPageState();
 }
 
-class _HistoryPageState extends State<HistoryPage> {
+class _HistoryPageState extends State<HistoryPage> with WidgetsBindingObserver {
   late final c = Get.find<HistoryController>();
-  final _searchCtrl = TextEditingController();
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initAndCheckOnboarding();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) c.reload();
   }
 
   Future<void> _initAndCheckOnboarding() async {
@@ -59,240 +68,202 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
-  @override
-  void dispose() {
-    _searchCtrl.dispose();
-    super.dispose();
+  void _openDeletedMediaPage() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const DeletedMediaPage()),
+    );
   }
 
-  Future<void> _clear() async {
+  Future<void> _deleteSelected() async {
+    if (c.selectedKeys.isEmpty) return;
     if (await confirmAction(
       context,
-      title: 'Xóa toàn bộ lịch sử?',
-      message: 'Toàn bộ bản sao thông báo đã mã hóa trên máy sẽ bị xóa.',
-      confirmLabel: 'Xóa tất cả',
+      title: 'Delete selected chats?',
+      message:
+          'Selected deleted-message conversations will be removed from this device.',
+      confirmLabel: 'Delete',
     )) {
-      await c.clear();
+      await c.deleteSelectedConversations();
     }
   }
 
   @override
-  Widget build(BuildContext context) => AppScaffold(
-    title: AppCopy.history,
-    onResume: c.reload,
-    actions: [
-      IconButton(
-        key: const Key('history-guide'),
-        onPressed: _openGuidePage,
-        tooltip: 'Hướng dẫn',
-        icon: const Icon(Icons.help_outline_rounded),
+  Widget build(BuildContext context) => Obx(() {
+    final inSelection = c.selectionMode.value;
+    final hasAccess = c.access.value;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F6F8),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFF5F6F8),
+        title: Text(
+          inSelection
+              ? 'Selected (${c.selectedKeys.length})'
+              : 'deleted_messages'.tr,
+          style: const TextStyle(fontWeight: FontWeight.w800),
+        ),
+        actions: [
+          if (inSelection) ...[
+            IconButton(
+              tooltip: 'Delete selected',
+              onPressed: c.selectedKeys.isEmpty ? null : _deleteSelected,
+              icon: const Icon(
+                Icons.delete_outline_rounded,
+                color: Color(0xFFD32F2F),
+              ),
+            ),
+            IconButton(
+              tooltip: 'Close selection',
+              onPressed: c.clearSelection,
+              icon: const Icon(Icons.close_rounded),
+            ),
+          ] else ...[
+            IconButton(
+              key: const Key('history-guide'),
+              onPressed: _openGuidePage,
+              tooltip: 'Guide',
+              icon: const Icon(Icons.help_outline_rounded),
+            ),
+            IconButton(
+              key: const Key('history-multi-select'),
+              onPressed: c.toggleSelectionMode,
+              tooltip: 'Select',
+              icon: const Icon(Icons.check_box_outlined),
+            ),
+          ],
+        ],
       ),
-      IconButton(
-        onPressed: c.reload,
-        tooltip: 'Tải lại',
-        icon: const Icon(Icons.refresh_rounded),
-      ),
-      IconButton(
-        onPressed: _clear,
-        tooltip: 'Xóa lịch sử',
-        icon: const Icon(Icons.delete_sweep_outlined),
-      ),
-    ],
-    children: [
-      // Expandable 5-point Reminder Banner matching original app's `layout_remind`
-      Obx(
-        () => Card(
-          color: const Color(0xFFFFFBF0),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-            side: const BorderSide(color: Color(0xFFF3E2B3)),
-          ),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(14),
-            onTap: c.toggleRemindGuide,
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 620),
+            child: Column(
+              children: [
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
                     children: [
-                      const Icon(
-                        Icons.lightbulb_outline_rounded,
-                        color: Color(0xFFD9822B),
-                        size: 22,
-                      ),
-                      const SizedBox(width: 10),
-                      const Expanded(
-                        child: Text(
-                          'Lưu ý quan trọng để không bỏ lỡ tin nhắn đã xóa',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                            color: Color(0xFF3E2E14),
+                      // Top green banner: `Deleted Media File ->` matching `orig_ad_closed.png`
+                      Material(
+                        color: const Color(0xFF08C567),
+                        borderRadius: BorderRadius.circular(14),
+                        child: InkWell(
+                          key: const Key('deleted-media-banner'),
+                          borderRadius: BorderRadius.circular(14),
+                          onTap: _openDeletedMediaPage,
+                          child: SizedBox(
+                            height: 62,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 18,
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.folder_copy_outlined,
+                                    color: Colors.white,
+                                    size: 26,
+                                  ),
+                                  const SizedBox(width: 14),
+                                  const Expanded(
+                                    child: Text(
+                                      'Deleted Media File',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 16.5,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                  Container(
+                                    width: 30,
+                                    height: 30,
+                                    decoration: const BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.arrow_forward_rounded,
+                                      color: Color(0xFF08C567),
+                                      size: 19,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                      Icon(
-                        c.showRemindGuide.value
-                            ? Icons.expand_less_rounded
-                            : Icons.expand_more_rounded,
-                        color: const Color(0xFF7B6339),
+                      const SizedBox(height: 12),
+                      TaskFeedback(controller: c, onRetry: c.reload),
+                      HistoryList(
+                        controller: c,
+                        onOpenGuide: _openGuidePage,
                       ),
                     ],
                   ),
-                  if (c.showRemindGuide.value) ...[
-                    const SizedBox(height: 10),
-                    const Divider(height: 1, color: Color(0xFFF0DEC2)),
-                    const SizedBox(height: 10),
-                    const _RemindBullet(
-                      number: '1',
-                      text:
-                          'Tính năng hoạt động bằng cách ghi lại thông báo đến trên thanh trạng thái.',
+                ),
+
+                // Bottom floating bar when Notification Access is not granted (`orig_ad_closed.png`)
+                if (!hasAccess)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
+                    child: Material(
+                      color: Colors.white,
+                      elevation: 4,
+                      shadowColor: const Color(0x26000000),
+                      borderRadius: BorderRadius.circular(16),
+                      child: InkWell(
+                        key: const Key('allow-notification-access-bar'),
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: c.openSettings,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.notifications_active_outlined,
+                                size: 26,
+                                color: Color(0xFF1C1F1D),
+                              ),
+                              const SizedBox(width: 14),
+                              const Expanded(
+                                child: Text(
+                                  'Allow Notification Access',
+                                  style: TextStyle(
+                                    fontSize: 15.5,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF1C1F1D),
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                width: 36,
+                                height: 36,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF08C567),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.arrow_forward_rounded,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
-                    const _RemindBullet(
-                      number: '2',
-                      text:
-                          'Tin nhắn bị xóa trước khi bạn cài đặt và cấp quyền sẽ không thể khôi phục.',
-                    ),
-                    const _RemindBullet(
-                      number: '3',
-                      text:
-                          'Hãy bật thông báo cho WhatsApp / WA Business trong Cài đặt điện thoại.',
-                    ),
-                    const _RemindBullet(
-                      number: '4',
-                      text:
-                          'Không tắt tiếng (Mute) cuộc trò chuyện mà bạn muốn theo dõi tin nhắn thu hồi.',
-                    ),
-                    const _RemindBullet(
-                      number: '5',
-                      text:
-                          'Nếu bạn đang mở trực tiếp cửa sổ chat đó khi tin nhắn đến, hệ thống không phát thông báo nên sẽ không ghi lại.',
-                    ),
-                  ],
-                ],
-              ),
+                  ),
+              ],
             ),
           ),
         ),
       ),
-      const SizedBox(height: 10),
-      GetBuilder<HistoryController>(
-        init: c,
-        builder: (_) => Card(
-          child: SwitchListTile(
-            title: const Text(
-              'Lưu thông báo mới',
-              style: TextStyle(fontWeight: FontWeight.w700),
-            ),
-            subtitle: const Text(
-              'Tự động lưu và mã hóa AES-256 trên máy để xem lại khi bị thu hồi.',
-            ),
-            value: c.enabled,
-            onChanged: c.toggle,
-          ),
-        ),
-      ),
-      const SizedBox(height: 8),
-      HistoryAccessCard(controller: c),
-      const SizedBox(height: 12),
-
-      // Search & Source Filter Row
-      TextField(
-        controller: _searchCtrl,
-        onChanged: c.setSearch,
-        decoration: InputDecoration(
-          hintText: 'Tìm người gửi hoặc nội dung tin nhắn...',
-          prefixIcon: const Icon(Icons.search_rounded),
-          suffixIcon: Obx(
-            () => c.searchQuery.value.isNotEmpty
-                ? IconButton(
-                    onPressed: () {
-                      _searchCtrl.clear();
-                      c.setSearch('');
-                    },
-                    icon: const Icon(Icons.clear_rounded),
-                  )
-                : const SizedBox.shrink(),
-          ),
-          filled: true,
-          fillColor: Colors.white,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: 10,
-          ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFFDADCE0)),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFFDADCE0)),
-          ),
-        ),
-      ),
-      const SizedBox(height: 10),
-      Obx(
-        () => Wrap(
-          spacing: 8,
-          children: [
-            ChoiceChip(
-              label: const Text('Tất cả'),
-              selected: c.sourceFilter.value == 0,
-              onSelected: (_) => c.setSourceFilter(0),
-            ),
-            ChoiceChip(
-              label: const Text('WhatsApp'),
-              selected: c.sourceFilter.value == 1,
-              onSelected: (_) => c.setSourceFilter(1),
-            ),
-            ChoiceChip(
-              label: const Text('WA Business'),
-              selected: c.sourceFilter.value == 2,
-              onSelected: (_) => c.setSourceFilter(2),
-            ),
-          ],
-        ),
-      ),
-      const SizedBox(height: 8),
-      TaskFeedback(controller: c, onRetry: c.reload),
-      HistoryList(controller: c),
-    ],
-  );
-}
-
-class _RemindBullet extends StatelessWidget {
-  const _RemindBullet({required this.number, required this.text});
-
-  final String number;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(bottom: 6),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '$number. ',
-          style: const TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: 13,
-            color: Color(0xFFB26214),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(
-              fontSize: 13,
-              color: Color(0xFF4F3E22),
-              height: 1.35,
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
+    );
+  });
 }

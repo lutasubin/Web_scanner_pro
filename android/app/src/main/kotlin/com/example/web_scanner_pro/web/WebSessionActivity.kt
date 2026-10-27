@@ -56,9 +56,6 @@ class WebSessionActivity : ComponentActivity() {
     private lateinit var toolbar: WebSessionToolbar
     private lateinit var message: TextView
     private lateinit var progress: ProgressBar
-    private lateinit var preLoginModeCard: LinearLayout
-    private lateinit var preLoginModeIcon: ImageView
-    private lateinit var preLoginModeLabel: TextView
     private lateinit var preLoginFab: LinearLayout
     private lateinit var preLoginFabIcon: ImageView
     private lateinit var preLoginFabLabel: TextView
@@ -269,38 +266,6 @@ class WebSessionActivity : ComponentActivity() {
             ),
         )
 
-        // Top floating login mode switcher pill (matches original app's pre-login mode indicator)
-        preLoginModeIcon = ImageView(this).apply {
-            setImageResource(R.drawable.ic_login_qr)
-            scaleType = ImageView.ScaleType.FIT_CENTER
-        }
-        preLoginModeLabel = TextView(this).apply {
-            text = "Đang dùng: Mã QR  ▼"
-            textSize = 13.5f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(0xFF1F2A24.toInt())
-            setPadding(dp(8), 0, dp(4), 0)
-        }
-        preLoginModeCard = LinearLayout(this).apply {
-            gravity = Gravity.CENTER_VERTICAL
-            background = GradientDrawable().apply {
-                setColor(Color.WHITE)
-                cornerRadius = dp(20).toFloat()
-                setStroke(dp(1), 0xFFDADCE0.toInt())
-            }
-            elevation = dp(4).toFloat()
-            setPadding(dp(12), dp(8), dp(12), dp(8))
-            addView(preLoginModeIcon, LinearLayout.LayoutParams(dp(18), dp(18)))
-            addView(preLoginModeLabel)
-            setOnClickListener { anchor ->
-                WebHelpDialogs.showLoginModePopup(this@WebSessionActivity, anchor, currentLoginMode) { selected ->
-                    if (selected != currentLoginMode) {
-                        toggleLoginModeOnWeb(view, selected)
-                    }
-                }
-            }
-        }
-
         // Bottom-right floating quick-switch button (matches original app's ivSwitchLoginMode + helper pill)
         preLoginFabIcon = ImageView(this).apply {
             setImageResource(R.drawable.ic_login_code)
@@ -388,17 +353,6 @@ class WebSessionActivity : ComponentActivity() {
                 ),
             )
             addView(
-                preLoginModeCard,
-                FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    Gravity.TOP or Gravity.END,
-                ).apply {
-                    topMargin = dp(10)
-                    marginEnd = dp(12)
-                },
-            )
-            addView(
                 preLoginFab,
                 FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -429,19 +383,13 @@ class WebSessionActivity : ComponentActivity() {
     }
 
     private fun updateLoginModeViews() {
-        if (!::preLoginModeCard.isInitialized) return
+        if (!::preLoginFab.isInitialized) return
         if (isLoggedIn) {
-            preLoginModeCard.visibility = View.GONE
             preLoginFab.visibility = View.GONE
             return
         }
-        preLoginModeCard.visibility = View.VISIBLE
         preLoginFab.visibility = View.VISIBLE
         val isQr = currentLoginMode == WebMobileLayout.MODE_QR
-        preLoginModeIcon.setImageResource(
-            if (isQr) R.drawable.ic_login_qr else R.drawable.ic_login_code,
-        )
-        preLoginModeLabel.text = if (isQr) "Chế độ: Mã QR  ▼" else "Chế độ: Số điện thoại  ▼"
         preLoginFabIcon.setImageResource(
             if (isQr) R.drawable.ic_login_code else R.drawable.ic_login_qr,
         )
@@ -621,8 +569,8 @@ class WebSessionActivity : ComponentActivity() {
                         onLoggedInDetected(view)
                     }
                     "entryMessageDetail" -> {
-                        // Keep top toolbar back button accessible; in detail mode it navigates back to chat list
-                        toolbar.setBackVisible(true)
+                        // Hide top toolbar back button inside chat detail so only WhatsApp's chat header back arrow shows (matches original app)
+                        toolbar.setBackVisible(false)
                     }
                     "leaveMessageDetail" -> {
                         toolbar.setBackVisible(true)

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../core/router/app_routes.dart';
+import '../help/how_to_use_page.dart';
 import '../sessions/web_session.dart';
 import 'feature_card.dart';
 import 'home_controller.dart';
@@ -43,6 +44,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) => Obx(
     () => HomeDashboard(
+      sessions: controller.sessions.toList(),
       activeSession: controller.activeSession,
       loading: controller.busy.value,
       error: controller.error.value,
@@ -50,13 +52,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       onDismissHandCoachmark: controller.dismissHandCoachmark,
       onSettings: () => Get.toNamed<void>(AppRoutes.settings),
       onAccount: controller.openActive,
+      onSelectSession: controller.openSession,
       onAccountManagement: _openAccounts,
       onDualApp: controller.openActive,
       onDeletedMessages: () => Get.toNamed<void>(AppRoutes.history),
       onDownloads: () => Get.toNamed<void>(AppRoutes.files),
       onStatusSaver: () => Get.toNamed<void>(AppRoutes.statuses),
       onDirectChat: () => Get.toNamed<void>(AppRoutes.directChat),
-      onHowToUse: () => Get.toNamed<void>(AppRoutes.howToUse),
+      onHowToUse: () => showHowToUseBottomSheet(context),
     ),
   );
 }
@@ -64,11 +67,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 class HomeDashboard extends StatelessWidget {
   const HomeDashboard({
     super.key,
+    this.sessions = const <WebSession>[],
     required this.activeSession,
     required this.loading,
     required this.error,
     required this.onSettings,
     required this.onAccount,
+    this.onSelectSession,
     required this.onAccountManagement,
     required this.onDualApp,
     required this.onDeletedMessages,
@@ -80,11 +85,13 @@ class HomeDashboard extends StatelessWidget {
     this.onDismissHandCoachmark,
   });
 
+  final List<WebSession> sessions;
   final WebSession? activeSession;
   final bool loading;
   final String error;
   final VoidCallback onSettings;
   final VoidCallback onAccount;
+  final ValueChanged<String>? onSelectSession;
   final VoidCallback onAccountManagement;
   final VoidCallback onDualApp;
   final VoidCallback onDeletedMessages;
@@ -95,98 +102,132 @@ class HomeDashboard extends StatelessWidget {
   final bool showHandCoachmark;
   final VoidCallback? onDismissHandCoachmark;
 
+  List<WebSession> get _effectiveSessions {
+    if (sessions.isNotEmpty) return sessions;
+    if (activeSession != null) return [activeSession!];
+    return const [];
+  }
+
   @override
-  Widget build(BuildContext context) => Scaffold(
-    body: SafeArea(
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 600),
-          child: CustomScrollView(
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            slivers: [
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-                sliver: SliverList.list(
-                  children: [
-                    _HomeHeader(onSettings: onSettings),
-                    if (loading) ...[
-                      const SizedBox(height: 4),
-                      const LinearProgressIndicator(minHeight: 2),
-                    ],
-                    if (error.isNotEmpty) ...[
-                      const SizedBox(height: 10),
-                      Text(
-                        error,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 10),
-                    if (activeSession case final session?) ...[
-                      _AccountPreviewCard(name: session.name, onTap: onAccount),
-                      const SizedBox(height: 13),
-                      _AccountManagementCard(onTap: onAccountManagement),
-                      const SizedBox(height: 17),
-                    ],
-                    _DualAppBanner(
-                      onTap: onDualApp,
-                      showHandCoachmark: showHandCoachmark,
-                      onDismissHandCoachmark: onDismissHandCoachmark,
-                    ),
-                    const SizedBox(height: 17),
-                    GridView(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate:
-                          const SliverGridDelegateWithMaxCrossAxisExtent(
-                            maxCrossAxisExtent: 220,
-                            mainAxisExtent: 104,
-                            mainAxisSpacing: 15,
-                            crossAxisSpacing: 15,
+  Widget build(BuildContext context) {
+    final accountList = _effectiveSessions;
+    return Scaffold(
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 600),
+            child: CustomScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              slivers: [
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+                  sliver: SliverList.list(
+                    children: [
+                      _HomeHeader(onSettings: onSettings),
+                      if (loading) ...[
+                        const SizedBox(height: 4),
+                        const LinearProgressIndicator(minHeight: 2),
+                      ],
+                      if (error.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        Text(
+                          error,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
                           ),
-                      children: [
-                        FeatureCard(
-                          key: const Key('deleted-messages'),
-                          icon: Icons.delete_outline_rounded,
-                          title: 'deleted_messages'.tr,
-                          onTap: onDeletedMessages,
-                        ),
-                        FeatureCard(
-                          key: const Key('downloads'),
-                          icon: Icons.file_download_outlined,
-                          title: 'downloads'.tr,
-                          onTap: onDownloads,
-                        ),
-                        FeatureCard(
-                          key: const Key('status-saver'),
-                          icon: Icons.downloading_outlined,
-                          title: 'status_saver'.tr,
-                          onTap: onStatusSaver,
-                        ),
-                        FeatureCard(
-                          key: const Key('direct-chat'),
-                          icon: Icons.chat_bubble_outline_rounded,
-                          title: 'direct_chat'.tr,
-                          onTap: onDirectChat,
-                        ),
-                        FeatureCard(
-                          key: const Key('how-to-use'),
-                          icon: Icons.help_outline_rounded,
-                          title: 'how_to_use'.tr,
-                          onTap: onHowToUse,
                         ),
                       ],
-                    ),
-                  ],
+                      const SizedBox(height: 10),
+                      if (accountList.isNotEmpty) ...[
+                        SizedBox(
+                          height: 96,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: accountList.length,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(width: 10),
+                            itemBuilder: (context, index) {
+                              final item = accountList[index];
+                              return _AccountPreviewCard(
+                                key: index == 0
+                                    ? const Key('active-account')
+                                    : Key('account-${item.id}'),
+                                name: item.name,
+                                paletteIndex: index,
+                                onTap: () {
+                                  if (onSelectSession != null) {
+                                    onSelectSession!(item.id);
+                                  } else {
+                                    onAccount();
+                                  }
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 13),
+                        _AccountManagementCard(onTap: onAccountManagement),
+                        const SizedBox(height: 17),
+                      ],
+                      _DualAppBanner(
+                        onTap: onDualApp,
+                        showHandCoachmark: showHandCoachmark,
+                        onDismissHandCoachmark: onDismissHandCoachmark,
+                      ),
+                      const SizedBox(height: 17),
+                      GridView(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        gridDelegate:
+                            const SliverGridDelegateWithMaxCrossAxisExtent(
+                              maxCrossAxisExtent: 220,
+                              mainAxisExtent: 104,
+                              mainAxisSpacing: 15,
+                              crossAxisSpacing: 15,
+                            ),
+                        children: [
+                          FeatureCard(
+                            key: const Key('deleted-messages'),
+                            icon: Icons.delete_outline_rounded,
+                            title: 'deleted_messages'.tr,
+                            onTap: onDeletedMessages,
+                          ),
+                          FeatureCard(
+                            key: const Key('downloads'),
+                            icon: Icons.create_new_folder_outlined,
+                            title: 'downloads'.tr,
+                            onTap: onDownloads,
+                          ),
+                          FeatureCard(
+                            key: const Key('status-saver'),
+                            icon: Icons.downloading_outlined,
+                            title: 'status_saver'.tr,
+                            onTap: onStatusSaver,
+                          ),
+                          FeatureCard(
+                            key: const Key('direct-chat'),
+                            icon: Icons.sms_outlined,
+                            title: 'direct_chat'.tr,
+                            onTap: onDirectChat,
+                          ),
+                          FeatureCard(
+                            key: const Key('how-to-use'),
+                            icon: Icons.help_outline_rounded,
+                            title: 'how_to_use'.tr,
+                            onTap: onHowToUse,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _HomeHeader extends StatelessWidget {
@@ -220,45 +261,47 @@ class _HomeHeader extends StatelessWidget {
 }
 
 class _AccountPreviewCard extends StatelessWidget {
-  const _AccountPreviewCard({required this.name, required this.onTap});
+  const _AccountPreviewCard({
+    super.key,
+    required this.name,
+    required this.onTap,
+    this.paletteIndex = 0,
+  });
 
   final String name;
   final VoidCallback onTap;
+  final int paletteIndex;
 
   @override
-  Widget build(BuildContext context) => Align(
-    alignment: Alignment.centerLeft,
-    child: SizedBox(
-      width: 96,
-      height: 96,
-      child: Card(
-        child: InkWell(
-          key: const Key('active-account'),
-          borderRadius: BorderRadius.circular(12),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const ProfileIcon(),
-                const SizedBox(height: 4),
-                Expanded(
-                  child: Align(
-                    alignment: Alignment.center,
-                    child: Text(
-                      name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                      ),
+  Widget build(BuildContext context) => SizedBox(
+    width: 96,
+    height: 96,
+    child: Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ProfileIcon(paletteIndex: paletteIndex),
+              const SizedBox(height: 6),
+              Expanded(
+                child: Align(
+                  alignment: Alignment.center,
+                  child: Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -501,22 +544,38 @@ class _DualAppBannerState extends State<_DualAppBanner>
 }
 
 class ProfileIcon extends StatelessWidget {
-  const ProfileIcon({super.key, this.filled = false});
+  const ProfileIcon({
+    super.key,
+    this.filled = false,
+    this.paletteIndex = 0,
+  });
 
   final bool filled;
+  final int paletteIndex;
+
+  static const _palettes = <(Color, Color)>[
+    (Color(0xFF08C567), Color(0xFFE7FAF0)),
+    (Color(0xFFDF871B), Color(0xFFFCF1E3)),
+    (Color(0xFFB7477D), Color(0xFFF9EAF1)),
+    (Color(0xFF4772B7), Color(0xFFEAF0F9)),
+    (Color(0xFF6F47B7), Color(0xFFEFEAF9)),
+  ];
 
   @override
-  Widget build(BuildContext context) => Container(
-    width: 32,
-    height: 32,
-    decoration: BoxDecoration(
-      color: filled ? const Color(0xFF08C567) : const Color(0xFFE7FAF0),
-      borderRadius: BorderRadius.circular(7),
-    ),
-    child: Icon(
-      Icons.person_outline_rounded,
-      color: filled ? Colors.white : const Color(0xFF08C567),
-      size: 23,
-    ),
-  );
+  Widget build(BuildContext context) {
+    final (accent, paleBg) = _palettes[paletteIndex % _palettes.length];
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        color: filled ? const Color(0xFF08C567) : paleBg,
+        shape: BoxShape.circle,
+      ),
+      child: Icon(
+        filled ? Icons.person_add_alt_1_outlined : Icons.person_outline_rounded,
+        color: filled ? Colors.white : accent,
+        size: 21,
+      ),
+    );
+  }
 }

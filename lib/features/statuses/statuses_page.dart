@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../core/constants/app_copy.dart';
 import '../../core/di/di.dart';
 import '../../core/models/media_record.dart';
 import '../../core/repositories/preferences_repository.dart';
-import '../../core/widgets/empty_state.dart';
 import '../../core/widgets/media_preview.dart';
-import '../../core/widgets/source_selector.dart';
 import '../../core/widgets/task_feedback.dart';
 import '../onboarding/feature_permission_onboarding.dart';
 import 'statuses_controller.dart';
@@ -82,6 +79,14 @@ class _StatusesPageState extends State<StatusesPage>
     );
   }
 
+  void _toggleSelectionMode() {
+    if (c.selectionMode.value) {
+      c.clearSelection();
+    } else {
+      c.selectionMode.value = true;
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Obx(() {
     final inSelection = c.selectionMode.value;
@@ -89,34 +94,38 @@ class _StatusesPageState extends State<StatusesPage>
     final isSavedTab = c.activeTab.value == 1;
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F6F8),
       appBar: AppBar(
+        backgroundColor: Colors.white,
         title: Text(
           inSelection
-              ? 'Đã chọn ${c.selectedIds.length} mục'
-              : AppCopy.statuses,
+              ? 'Selected (${c.selectedIds.length})'
+              : 'status_saver'.tr,
+          style: const TextStyle(fontWeight: FontWeight.w800),
         ),
         actions: [
           if (inSelection) ...[
             IconButton(
-              tooltip: 'Chọn tất cả',
+              tooltip: 'Select all',
               onPressed: c.selectAllCurrent,
               icon: const Icon(Icons.select_all_rounded),
             ),
             IconButton(
-              tooltip: 'Bỏ chọn',
+              tooltip: 'Close selection',
               onPressed: c.clearSelection,
               icon: const Icon(Icons.close_rounded),
             ),
           ] else ...[
             IconButton(
-              tooltip: 'Hướng dẫn',
+              tooltip: 'Guide',
               onPressed: _showGuideSheet,
               icon: const Icon(Icons.help_outline_rounded),
             ),
             IconButton(
-              tooltip: 'Tải lại',
-              onPressed: c.load,
-              icon: const Icon(Icons.refresh_rounded),
+              key: const Key('statuses-multi-select'),
+              tooltip: 'Select',
+              onPressed: _toggleSelectionMode,
+              icon: const Icon(Icons.check_box_outlined),
             ),
           ],
         ],
@@ -127,135 +136,70 @@ class _StatusesPageState extends State<StatusesPage>
             constraints: const BoxConstraints(maxWidth: 680),
             child: Column(
               children: [
-                // Top Segmented Tabs: Trạng thái vs Đã lưu (matches original app's TabLayout)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEAF2EE),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: _TabPill(
-                            key: const Key('tab-statuses'),
-                            label: 'Trạng thái (${c.items.length})',
-                            selected: c.activeTab.value == 0,
-                            onTap: () => c.setTab(0),
-                          ),
-                        ),
-                        Expanded(
-                          child: _TabPill(
-                            key: const Key('tab-saved'),
-                            label: 'Đã lưu (${c.savedItems.length})',
-                            selected: c.activeTab.value == 1,
-                            onTap: () => c.setTab(1),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // Source & Folder Controls on "Trạng thái" tab
-                if (!isSavedTab)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Column(
-                      children: [
-                        SourceSelector(
-                          business: c.business.value,
-                          enabled: !c.busy.value,
-                          onChanged: c.changeSource,
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: FilledButton.icon(
-                                key: const Key('select-status-folder'),
-                                onPressed: c.selectFolder,
-                                icon: const Icon(
-                                  Icons.folder_open_rounded,
-                                  size: 20,
-                                ),
-                                label: const Text('Chọn thư mục Status'),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            OutlinedButton.icon(
-                              onPressed: _showGuideSheet,
-                              icon: const Icon(
-                                Icons.info_outline_rounded,
-                                size: 18,
-                              ),
-                              label: const Text('Cách dùng'),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                // Filter chips: Tất cả / Ảnh / Video
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+                // 2-Tab Underline TabBar (`Status` | `Saved`) matching `orig_status_saver_real.png`
+                Container(
+                  color: Colors.white,
                   child: Row(
                     children: [
-                      _FilterChipButton(
-                        label: 'Tất cả',
-                        selected: c.typeFilter.value == 0,
-                        onTap: () => c.setTypeFilter(0),
-                      ),
-                      const SizedBox(width: 8),
-                      _FilterChipButton(
-                        label: 'Ảnh',
-                        selected: c.typeFilter.value == 1,
-                        onTap: () => c.setTypeFilter(1),
-                      ),
-                      const SizedBox(width: 8),
-                      _FilterChipButton(
-                        label: 'Video',
-                        selected: c.typeFilter.value == 2,
-                        onTap: () => c.setTypeFilter(2),
-                      ),
-                      const Spacer(),
-                      if (list.isNotEmpty && !inSelection)
-                        TextButton.icon(
-                          onPressed: c.selectAllCurrent,
-                          icon: const Icon(Icons.checklist_rounded, size: 18),
-                          label: const Text('Chọn nhiều'),
+                      Expanded(
+                        child: _UnderlineTabItem(
+                          key: const Key('tab-statuses'),
+                          label: 'Status',
+                          selected: c.activeTab.value == 0,
+                          onTap: () => c.setTab(0),
                         ),
+                      ),
+                      Expanded(
+                        child: _UnderlineTabItem(
+                          key: const Key('tab-saved'),
+                          label: 'Saved',
+                          selected: c.activeTab.value == 1,
+                          onTap: () => c.setTab(1),
+                        ),
+                      ),
                     ],
                   ),
                 ),
+                const Divider(height: 1, color: Color(0xFFE7EAE8)),
 
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: TaskFeedback(controller: c, onRetry: c.load),
                 ),
 
-                // Grid Content
+                // Grid or Empty State
                 Expanded(
                   child: list.isEmpty
-                      ? SingleChildScrollView(
-                          padding: const EdgeInsets.all(20),
-                          child: EmptyState(
-                            icon: isSavedTab
-                                ? Icons.bookmark_border_rounded
-                                : Icons.photo_library_outlined,
-                            title: isSavedTab
-                                ? 'Chưa có trạng thái đã lưu'
-                                : 'Chưa có ảnh hoặc video trạng thái',
-                            description: isSavedTab
-                                ? 'Các ảnh và video trạng thái bạn nhấn Lưu sẽ xuất hiện tại đây để xem lại bất cứ lúc nào.'
-                                : 'Hãy mở WhatsApp xem trạng thái trước, sau đó nhấn “Chọn thư mục Status” và cấp quyền thư mục .Statuses.',
+                      ? Center(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.all(28),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Image.asset(
+                                  'assets/images/no_content.webp',
+                                  width: 132,
+                                  height: 132,
+                                  fit: BoxFit.contain,
+                                ),
+                                const SizedBox(height: 14),
+                                Text(
+                                  isSavedTab
+                                      ? 'No saved statuses yet'
+                                      : 'No status updates found yet',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF6B7870),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         )
                       : GridView.builder(
-                          padding: const EdgeInsets.fromLTRB(16, 6, 16, 20),
+                          padding: const EdgeInsets.fromLTRB(16, 14, 16, 20),
                           gridDelegate:
                               const SliverGridDelegateWithMaxCrossAxisExtent(
                                 maxCrossAxisExtent: 200,
@@ -291,6 +235,62 @@ class _StatusesPageState extends State<StatusesPage>
                         ),
                 ),
 
+                // Bottom floating bar when on Status tab and folder access can be granted
+                if (!inSelection && !isSavedTab && list.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
+                    child: Material(
+                      color: Colors.white,
+                      elevation: 4,
+                      shadowColor: const Color(0x26000000),
+                      borderRadius: BorderRadius.circular(16),
+                      child: InkWell(
+                        key: const Key('select-status-folder'),
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: c.selectFolder,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.folder_outlined,
+                                size: 26,
+                                color: Color(0xFF1C1F1D),
+                              ),
+                              const SizedBox(width: 14),
+                              const Expanded(
+                                child: Text(
+                                  "Tap ‘USE THIS FOLDER’ to save statuses",
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF1C1F1D),
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                width: 36,
+                                height: 36,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF08C567),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.arrow_forward_rounded,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
                 // Bottom multi-select bar
                 if (inSelection)
                   Container(
@@ -313,17 +313,21 @@ class _StatusesPageState extends State<StatusesPage>
                         if (!isSavedTab)
                           Expanded(
                             child: FilledButton.icon(
-                              onPressed: c.saveSelected,
+                              onPressed: c.selectedIds.isEmpty
+                                  ? null
+                                  : c.saveSelected,
                               icon: const Icon(Icons.download_rounded),
-                              label: Text('Lưu (${c.selectedIds.length})'),
+                              label: Text('Save (${c.selectedIds.length})'),
                             ),
                           )
                         else
                           Expanded(
                             child: FilledButton.tonalIcon(
-                              onPressed: c.deleteSelectedSaved,
+                              onPressed: c.selectedIds.isEmpty
+                                  ? null
+                                  : c.deleteSelectedSaved,
                               icon: const Icon(Icons.delete_outline_rounded),
-                              label: Text('Xóa (${c.selectedIds.length})'),
+                              label: Text('Delete (${c.selectedIds.length})'),
                             ),
                           ),
                       ],
@@ -338,8 +342,8 @@ class _StatusesPageState extends State<StatusesPage>
   });
 }
 
-class _TabPill extends StatelessWidget {
-  const _TabPill({
+class _UnderlineTabItem extends StatelessWidget {
+  const _UnderlineTabItem({
     super.key,
     required this.label,
     required this.selected,
@@ -352,44 +356,34 @@ class _TabPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => InkWell(
-    borderRadius: BorderRadius.circular(11),
     onTap: onTap,
-    child: Container(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      decoration: BoxDecoration(
-        color: selected ? const Color(0xFF08C567) : Colors.transparent,
-        borderRadius: BorderRadius.circular(11),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        label,
-        style: TextStyle(
-          color: selected ? Colors.white : const Color(0xFF1F2A24),
-          fontWeight: FontWeight.w700,
-          fontSize: 14,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 15.5,
+              fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+              color: selected
+                  ? const Color(0xFF1C1F1D)
+                  : const Color(0xFF8C9690),
+            ),
+          ),
         ),
-      ),
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          height: 3,
+          width: 48,
+          decoration: BoxDecoration(
+            color: selected ? const Color(0xFF08C567) : Colors.transparent,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+      ],
     ),
-  );
-}
-
-class _FilterChipButton extends StatelessWidget {
-  const _FilterChipButton({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => ChoiceChip(
-    label: Text(label),
-    selected: selected,
-    onSelected: (_) => onTap(),
-    visualDensity: VisualDensity.compact,
   );
 }
 
@@ -515,7 +509,7 @@ class _StatusGridCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 3),
                         Text(
-                          isSaved ? 'Chia sẻ' : 'Lưu',
+                          isSaved ? 'Share' : 'Save',
                           style: const TextStyle(
                             fontSize: 11.5,
                             fontWeight: FontWeight.w700,
