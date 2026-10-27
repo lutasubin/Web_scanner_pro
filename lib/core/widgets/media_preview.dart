@@ -3,8 +3,19 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../di/di.dart';
 import '../models/media_record.dart';
 import '../repositories/media_repository.dart';
+
+MediaRepository? _resolveMediaRepository() {
+  if (services.isRegistered<MediaRepository>()) {
+    return services<MediaRepository>();
+  }
+  if (Get.isRegistered<MediaRepository>()) {
+    return Get.find<MediaRepository>();
+  }
+  return null;
+}
 
 class MediaPreviewBox extends StatelessWidget {
   const MediaPreviewBox({
@@ -20,9 +31,7 @@ class MediaPreviewBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final repo = Get.isRegistered<MediaRepository>()
-        ? Get.find<MediaRepository>()
-        : null;
+    final repo = _resolveMediaRepository();
 
     if (!record.isImage && !record.isVideo) {
       return _FallbackTile(record: record, borderRadius: borderRadius);
@@ -178,9 +187,7 @@ class _MediaViewerPageState extends State<MediaViewerPage> {
   @override
   Widget build(BuildContext context) {
     if (_items.isEmpty) return const SizedBox.shrink();
-    final repo = Get.isRegistered<MediaRepository>()
-        ? Get.find<MediaRepository>()
-        : null;
+    final repo = _resolveMediaRepository();
     final item = _current;
 
     return Scaffold(

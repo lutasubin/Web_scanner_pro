@@ -9,10 +9,13 @@ import android.webkit.URLUtil
 import android.webkit.WebView
 import com.example.web_scanner_pro.media.OwnedDownloads
 import com.example.web_scanner_pro.media.PendingDownload
+import com.example.web_scanner_pro.media.StatusFolders
 import org.json.JSONObject
+import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
+import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
@@ -22,7 +25,8 @@ internal class WebDownloadHandler(
     context: Context,
     private val status: (String) -> Unit,
 ) {
-    private val downloads = OwnedDownloads(context.applicationContext)
+    private val appContext = context.applicationContext
+    private val downloads = OwnedDownloads(appContext)
     private val main = Handler(Looper.getMainLooper())
     private val token = UUID.randomUUID().toString()
     private val blobs = ConcurrentHashMap<String, BlobTransfer>()
@@ -153,6 +157,55 @@ internal class WebDownloadHandler(
         if (secret != token) return
         if (id.isNotBlank()) blobs.remove(id)?.target?.abort()
         post("Không tải được tệp từ phiên web. Hãy thử lại.")
+    }
+
+    @JavascriptInterface
+    fun saveDataUrl(dataUrl: String, keyHint: String, cacheOnly: Boolean): Boolean {
+        if (!dataUrl.startsWith("data:")) return false
+        val commaIndex = dataUrl.indexOf(',')
+        if (commaIndex <= 5) return false
+        val header = dataUrl.substring(5, commaIndex)
+        val mimeType = header.substringBefore(';').trim().lowercase().ifBlank { "image/jpeg" }
+        val isMedia = mimeType.startsWith("image/") || mimeType.startsWith("video/")
+        if (!isMedia) return false
+        val payload = dataUrl.substring(commaIndex + 1)
+        executor.execute {
+            try {
+                val bytes = Base64.decode(payload, Base64.DEFAULT)
+                if (bytes.isEmpty()) return@execute
+                val ext = when {
+                    mimeType.contains("mp4") || mimeType.startsWith("video/") -> "mp4"
+                    mimeType.contains("png") -> "png"
+                    mimeType.contains("webp") -> "webp"
+                    mimeType.contains("gif") -> "gif"
+                    else -> "jpg"
+                }
+                val digest = MessageDigest.getInstance("SHA-1").digest(bytes)
+                    .take(8)
+                    .joinToString("") { "%02x".format(it) }
+                val fileName = "status_$digest.$ext"
+                val cacheFile = File(StatusFolders.webStatusDir(appContext), fileName)
+                if (!cacheFile.exists() || cacheFile.length() != bytes.size.toLong()) {
+                    cacheFile.writeBytes(bytes)
+                }
+                if (!cacheOnly) {
+                    val target = downloads.open(fileName, mimeType)
+                    try {
+                        target.write(bytes)
+                        target.publish()
+                        post("Đã lưu trạng thái ($fileName) vào mục Đã lưu & Tải xuống.")
+                    } catch (e: Exception) {
+                        target.abort()
+                        throw e
+                    }
+                }
+            } catch (_: Exception) {
+                if (!cacheOnly) {
+                    post("Không lưu được trạng thái. Hãy thử lại.")
+                }
+            }
+        }
+        return true
     }
 
     private fun blobScript(url: String, name: String, mimeType: String?, length: Long): String {

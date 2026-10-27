@@ -2,6 +2,7 @@ package com.example.web_scanner_pro.media
 
 import android.app.Activity
 import android.content.Intent
+import android.net.Uri
 import android.provider.DocumentsContract
 import io.flutter.plugin.common.MethodChannel
 
@@ -17,10 +18,15 @@ internal class StatusFolderPicker(private val activity: Activity, private val fo
         }
         pending = result
         pendingBusiness = business
+        val defaultTreeUri = if (business) {
+            Uri.parse("content://com.android.externalstorage.documents/document/primary%3AAndroid%2Fmedia%2Fcom.whatsapp.w4b%2FWhatsApp%20Business%2FMedia%2F.Statuses")
+        } else {
+            Uri.parse("content://com.android.externalstorage.documents/document/primary%3AAndroid%2Fmedia%2Fcom.whatsapp%2FWhatsApp%2FMedia%2F.Statuses")
+        }
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
             putExtra(Intent.EXTRA_LOCAL_ONLY, true)
-            folders.selected(business)?.let { putExtra(DocumentsContract.EXTRA_INITIAL_URI, it) }
+            putExtra(DocumentsContract.EXTRA_INITIAL_URI, folders.selected(business) ?: defaultTreeUri)
         }
         try {
             activity.startActivityForResult(intent, requestCode)
