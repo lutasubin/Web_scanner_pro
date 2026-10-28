@@ -9,8 +9,13 @@ class PreferencesRepository {
   final AppPlatform _platform;
   final value = const AppPreferences().obs;
   String? initializationError;
+  Future<void>? _loadFuture;
 
-  Future<void> load() async {
+  Future<void> load() => _loadFuture = _doLoad();
+
+  Future<void> ensureLoaded() => _loadFuture ?? load();
+
+  Future<void> _doLoad() async {
     value.value = AppPreferences.fromMap(
       await _platform.readMap('getSettings'),
     );

@@ -8,15 +8,29 @@ import '../repositories/preferences_repository.dart';
 
 final services = GetIt.instance;
 
+void registerLazyDependencies({AppPlatform? platform}) {
+  if (!services.isRegistered<AppPlatform>()) {
+    services.registerLazySingleton<AppPlatform>(() => platform ?? AppPlatform());
+  }
+  if (!services.isRegistered<MediaRepository>()) {
+    services.registerLazySingleton(() => MediaRepository(services()));
+  }
+  if (!services.isRegistered<PreferencesRepository>()) {
+    services.registerLazySingleton(() => PreferencesRepository(services()));
+  }
+  if (!services.isRegistered<RemoteConfigService>()) {
+    services.registerLazySingleton<RemoteConfigService>(RemoteConfigService.new);
+  }
+  if (!services.isRegistered<AdService>()) {
+    services.registerLazySingleton<AdService>(
+      () => AdService(services<RemoteConfigService>()),
+    );
+  }
+}
+
 Future<void> configureDependencies({AppPlatform? platform}) async {
   if (services.isRegistered<AppPlatform>()) await services.reset();
-  services.registerLazySingleton<AppPlatform>(() => platform ?? AppPlatform());
-  services.registerLazySingleton(() => MediaRepository(services()));
-  services.registerLazySingleton(() => PreferencesRepository(services()));
-  services.registerLazySingleton<RemoteConfigService>(RemoteConfigService.new);
-  services.registerLazySingleton<AdService>(
-    () => AdService(services<RemoteConfigService>()),
-  );
+  registerLazyDependencies(platform: platform);
   try {
     await services<PreferencesRepository>().load();
   } catch (_) {

@@ -65,34 +65,38 @@ class StatusMonitorService : Service() {
 
     private fun startWatching() {
         val appContext = applicationContext
-        seedExistingStatuses(appContext)
-
-        val watchDirs = LinkedHashSet<File>()
-        watchDirs.add(StatusFolders.webStatusDir(appContext))
-        val ext = runCatching { Environment.getExternalStorageDirectory() }.getOrNull()
-        if (ext != null) {
-            watchDirs.add(File(ext, "Android/media/com.whatsapp/WhatsApp/Media/.Statuses"))
-            watchDirs.add(File(ext, "WhatsApp/Media/.Statuses"))
-            watchDirs.add(File(ext, "Android/media/com.whatsapp.w4b/WhatsApp Business/Media/.Statuses"))
-            watchDirs.add(File(ext, "WhatsApp Business/Media/.Statuses"))
-        }
-
-        val mask = FileObserver.MOVED_TO or
-            FileObserver.CLOSE_WRITE or
-            FileObserver.DELETE or
-            FileObserver.DELETE_SELF
-
-        for (dir in watchDirs) {
-            if (!dir.exists() && dir != StatusFolders.webStatusDir(appContext)) continue
-            runCatching {
-                val observer = createDirectoryObserver(appContext, dir, mask)
-                observer.startWatching()
-                observers.add(observer)
-            }
-        }
-
         val executor = Executors.newSingleThreadScheduledExecutor()
         poller = executor
+        executor.execute {
+            runCatching {
+                seedExistingStatuses(appContext)
+                val watchDirs = LinkedHashSet<File>()
+                watchDirs.add(StatusFolders.webStatusDir(appContext))
+                val ext = runCatching { Environment.getExternalStorageDirectory() }.getOrNull()
+                if (ext != null) {
+                    watchDirs.add(File(ext, "Android/media/com.whatsapp/WhatsApp/Media/.Statuses"))
+                    watchDirs.add(File(ext, "WhatsApp/Media/.Statuses"))
+                    watchDirs.add(File(ext, "Android/media/com.whatsapp.w4b/WhatsApp Business/Media/.Statuses"))
+                    watchDirs.add(File(ext, "WhatsApp Business/Media/.Statuses"))
+                }
+
+                val mask = FileObserver.MOVED_TO or
+                    FileObserver.CLOSE_WRITE or
+                    FileObserver.DELETE or
+                    FileObserver.DELETE_SELF
+
+                for (dir in watchDirs) {
+                    if (!dir.exists() && dir != StatusFolders.webStatusDir(appContext)) continue
+                    runCatching {
+                        val observer = createDirectoryObserver(appContext, dir, mask)
+                        observer.startWatching()
+                        synchronized(observers) {
+                            observers.add(observer)
+                        }
+                    }
+                }
+            }
+        }
         executor.scheduleWithFixedDelay(
             { runCatching { pollForChanges(appContext) } },
             1500L,
@@ -102,10 +106,12 @@ class StatusMonitorService : Service() {
     }
 
     private fun stopWatching() {
-        for (observer in observers) {
-            runCatching { observer.stopWatching() }
+        synchronized(observers) {
+            for (observer in observers) {
+                runCatching { observer.stopWatching() }
+            }
+            observers.clear()
         }
-        observers.clear()
         poller?.shutdownNow()
         poller = null
     }
@@ -224,7 +230,6 @@ class StatusMonitorService : Service() {
 
         fun ensureRunning(context: Context, refreshWatchers: Boolean = false) {
             val appContext = context.applicationContext
-            seedExistingStatuses(appContext)
             val intent = Intent(appContext, StatusMonitorService::class.java).apply {
                 if (refreshWatchers) {
                     action = ACTION_REFRESH_WATCHERS

@@ -81,7 +81,7 @@ class AdService with WidgetsBindingObserver {
       preloadAppOpen();
       preloadInterstitial();
       if (defaultTargetPlatform == TargetPlatform.android) {
-        await _preloadAndroidNativeQueue();
+        unawaited(_preloadAndroidNativeQueue());
       } else {
         // Pre-warm Native Ad queues for active styles on iOS
         final activeStyles = <int>{
@@ -275,7 +275,7 @@ class AdService with WidgetsBindingObserver {
   /// - `splash_ad_style == 1`: App Open Ad (with 7000ms load timeout)
   /// - `splash_ad_style == 2`: Interstitial Ad (with 7000ms load timeout)
   Future<void> showColdStartAd({
-    Duration timeout = const Duration(milliseconds: 7000),
+    Duration timeout = const Duration(milliseconds: 2200),
   }) async {
     if (!isSupportedPlatform || !rc.adsGlobalEnabled.value) return;
     final style = rc.splashAdStyle.value;

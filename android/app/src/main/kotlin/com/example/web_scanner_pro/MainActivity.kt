@@ -22,7 +22,13 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
-    private lateinit var media: MediaBridge
+    private var mediaInstance: MediaBridge? = null
+    private val media: MediaBridge
+        get() = mediaInstance ?: MediaBridge(this).also { mediaInstance = it }
+    private val web by lazy(LazyThreadSafetyMode.NONE) { WebBridge(this) }
+    private val history by lazy(LazyThreadSafetyMode.NONE) { HistoryBridge(this) }
+    private val settings by lazy(LazyThreadSafetyMode.NONE) { SettingsBridge(this) }
+    private val directChat by lazy(LazyThreadSafetyMode.NONE) { DirectChatBridge(this) }
     private var pendingRoute: String? = null
     private var platformChannel: MethodChannel? = null
     private val statusUpdateListener: () -> Unit = {
@@ -38,8 +44,6 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        ensurePostNotificationsPermission()
-        StatusMonitorService.ensureRunning(this)
         StatusMonitorService.addListener(statusUpdateListener)
         NotificationCaptureService.onHistoryUpdated = historyUpdateListener
         WebScannerNativeAdFactory.registerAll(flutterEngine, layoutInflater)
@@ -58,11 +62,12 @@ class MainActivity : FlutterActivity() {
                 DualAppNativeFactory(flutterEngine.dartExecutor.binaryMessenger) { this },
             )
         pendingRoute = intent?.getStringExtra("open_route") ?: pendingRoute
-        media = MediaBridge(this)
-        val web = WebBridge(this)
-        val history = HistoryBridge(this)
-        val settings = SettingsBridge(this)
-        val directChat = DirectChatBridge(this)
+        window.decorView.post {
+            if (!isDestroyed && !isFinishing) {
+                ensurePostNotificationsPermission()
+                StatusMonitorService.ensureRunning(this)
+            }
+        }
         val channel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             "web_scanner_pro/platform",
@@ -132,7 +137,7 @@ class MainActivity : FlutterActivity() {
 
     @Deprecated("Flutter Activity integration uses the Android activity result callback")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        if (::media.isInitialized && media.onActivityResult(requestCode, resultCode, data)) return
+        if (mediaInstance?.onActivityResult(requestCode, resultCode, data) == true) return
         super.onActivityResult(requestCode, resultCode, data)
     }
 
@@ -151,7 +156,8 @@ class MainActivity : FlutterActivity() {
         if (NotificationCaptureService.onHistoryUpdated === historyUpdateListener) {
             NotificationCaptureService.onHistoryUpdated = null
         }
-        if (::media.isInitialized) media.dispose()
+        mediaInstance?.dispose()
+        mediaInstance = null
         super.onDestroy()
     }
 }

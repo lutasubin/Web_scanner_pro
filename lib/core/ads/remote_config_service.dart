@@ -189,8 +189,8 @@ class RemoteConfigService {
       _syncFromRemoteConfig(rc);
       isInitialized.value = true;
 
-      // Fetch and activate in background or during splash
-      await fetchAndActivate();
+      // Fetch and activate in background without blocking startup
+      unawaited(fetchAndActivate());
 
       // Listen for real-time Remote Config pushes from Firebase Console / CLI
       _configUpdateSub?.cancel();

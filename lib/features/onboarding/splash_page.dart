@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:get/get.dart';
 
 import '../../core/ads/ad_service.dart';
@@ -24,12 +25,15 @@ class _SplashPageState extends State<SplashPage>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      FlutterNativeSplash.remove();
+    });
     _progressCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1350),
+      duration: const Duration(milliseconds: 850),
     )..forward();
     _checkImmediatePendingRoute();
-    _navTimer = Timer(const Duration(milliseconds: 1450), _finishSplash);
+    _navTimer = Timer(const Duration(milliseconds: 900), _finishSplash);
   }
 
   Future<void> _checkImmediatePendingRoute() async {
@@ -66,6 +70,9 @@ class _SplashPageState extends State<SplashPage>
     if (!mounted) return;
     final platform = services<AppPlatform>();
     final prefs = services<PreferencesRepository>();
+    try {
+      await prefs.ensureLoaded();
+    } catch (_) {}
 
     try {
       final pending = await platform.invoke<String>('consumePendingRoute');
