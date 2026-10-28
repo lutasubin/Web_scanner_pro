@@ -1,0 +1,163 @@
+package com.weappsinc.webscanerpro
+
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import com.weappsinc.webscanerpro.ads.DualAppBannerFactory
+import com.weappsinc.webscanerpro.ads.DualAppNativeAdManager
+import com.weappsinc.webscanerpro.ads.DualAppNativeFactory
+import com.weappsinc.webscanerpro.ads.WebScannerNativeAdFactory
+import com.weappsinc.webscanerpro.history.HistoryBridge
+import com.weappsinc.webscanerpro.history.NotificationCaptureService
+import com.weappsinc.webscanerpro.media.MediaBridge
+import com.weappsinc.webscanerpro.media.StatusMonitorService
+import com.weappsinc.webscanerpro.platform.DirectChatBridge
+import com.weappsinc.webscanerpro.platform.SettingsBridge
+import com.weappsinc.webscanerpro.web.WebBridge
+import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodChannel
+
+class MainActivity : FlutterActivity() {
+    private var mediaInstance: MediaBridge? = null
+    private val media: MediaBridge
+        get() = mediaInstance ?: MediaBridge(this).also { mediaInstance = it }
+    private val web by lazy(LazyThreadSafetyMode.NONE) { WebBridge(this) }
+    private val history by lazy(LazyThreadSafetyMode.NONE) { HistoryBridge(this) }
+    private val settings by lazy(LazyThreadSafetyMode.NONE) { SettingsBridge(this) }
+    private val directChat by lazy(LazyThreadSafetyMode.NONE) { DirectChatBridge(this) }
+    private var pendingRoute: String? = null
+    private var platformChannel: MethodChannel? = null
+    private val statusUpdateListener: () -> Unit = {
+        runCatching {
+            platformChannel?.invokeMethod("onStatusesUpdated", null)
+        }
+    }
+    private val historyUpdateListener: () -> Unit = {
+        runCatching {
+            platformChannel?.invokeMethod("onHistoryUpdated", null)
+        }
+    }
+
+    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+        super.configureFlutterEngine(flutterEngine)
+        StatusMonitorService.addListener(statusUpdateListener)
+        NotificationCaptureService.onHistoryUpdated = historyUpdateListener
+        WebScannerNativeAdFactory.registerAll(flutterEngine, layoutInflater)
+        flutterEngine
+            .platformViewsController
+            .registry
+            .registerViewFactory(
+                "com.example.dual_app/banner_ad",
+                DualAppBannerFactory(flutterEngine.dartExecutor.binaryMessenger) { this },
+            )
+        flutterEngine
+            .platformViewsController
+            .registry
+            .registerViewFactory(
+                "com.example.dual_app/native_ad",
+                DualAppNativeFactory(flutterEngine.dartExecutor.binaryMessenger) { this },
+            )
+        pendingRoute = intent?.getStringExtra("open_route") ?: pendingRoute
+        window.decorView.post {
+            if (!isDestroyed && !isFinishing) {
+                ensurePostNotificationsPermission()
+                StatusMonitorService.ensureRunning(this)
+            }
+        }
+        val channel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "web_scanner_pro/platform",
+        )
+        platformChannel = channel
+        channel.setMethodCallHandler { call, result ->
+            try {
+                if (call.method == "getCapabilities") {
+                    result.success(mapOf(
+                        "multiProfile" to WebBridge.supportsProfiles(),
+                        "notificationAccess" to HistoryBridge.hasAccess(this)
+                    ))
+                } else if (call.method == "consumePendingRoute") {
+                    val route = pendingRoute
+                    pendingRoute = null
+                    result.success(route)
+                } else if (call.method == "setNativeCollabCollapsed") {
+                    val collapsed = call.argument<Boolean>("collapsed") ?: false
+                    WebScannerNativeAdFactory.setCollabCollapsed(collapsed)
+                    result.success(null)
+                } else if (call.method == "preloadNativeAds") {
+                    val adUnitId = call.argument<String>("adUnitId").orEmpty()
+                    val fallbackAdUnitId = call.argument<String>("fallbackAdUnitId").orEmpty()
+                    DualAppNativeAdManager.configureAndPreload(this, adUnitId, fallbackAdUnitId)
+                    result.success(DualAppNativeAdManager.cachedCount())
+                } else if (call.method == "getNativeCachedCount") {
+                    result.success(DualAppNativeAdManager.cachedCount())
+                } else if (!settings.handle(call, result) &&
+                    !directChat.handle(call, result) && !web.handle(call, result) &&
+                    !history.handle(call, result) && !media.handle(call, result)) {
+                    result.notImplemented()
+                }
+            } catch (_: Exception) {
+                result.error("platform_error", "Không thể hoàn tất thao tác. Hãy thử lại.", null)
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        intent.getStringExtra("open_route")?.takeIf { it.isNotBlank() }?.let { route ->
+            pendingRoute = route
+            runCatching {
+                platformChannel?.invokeMethod("onOpenRoute", route)
+            }
+        }
+    }
+
+    private fun ensurePostNotificationsPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS,
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                runCatching {
+                    ActivityCompat.requestPermissions(
+                        this,
+                        arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                        7420,
+                    )
+                }
+            }
+        }
+    }
+
+    @Deprecated("Flutter Activity integration uses the Android activity result callback")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (mediaInstance?.onActivityResult(requestCode, resultCode, data) == true) return
+        super.onActivityResult(requestCode, resultCode, data)
+    }
+
+    override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        StatusMonitorService.removeListener(statusUpdateListener)
+        if (NotificationCaptureService.onHistoryUpdated === historyUpdateListener) {
+            NotificationCaptureService.onHistoryUpdated = null
+        }
+        platformChannel = null
+        WebScannerNativeAdFactory.unregisterAll(flutterEngine)
+        super.cleanUpFlutterEngine(flutterEngine)
+    }
+
+    override fun onDestroy() {
+        StatusMonitorService.removeListener(statusUpdateListener)
+        if (NotificationCaptureService.onHistoryUpdated === historyUpdateListener) {
+            NotificationCaptureService.onHistoryUpdated = null
+        }
+        mediaInstance?.dispose()
+        mediaInstance = null
+        super.onDestroy()
+    }
+}

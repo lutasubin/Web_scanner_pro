@@ -12,7 +12,7 @@ class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
 
   static const _kPlayStoreUrl =
-      'https://play.google.com/store/apps/details?id=com.example.web_scanner_pro';
+      'https://play.google.com/store/apps/details?id=com.weappsinc.webscanerpro';
 
   Future<void> _shareApp(BuildContext context) async {
     try {
