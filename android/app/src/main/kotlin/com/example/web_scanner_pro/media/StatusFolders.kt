@@ -113,6 +113,195 @@ internal class StatusFolders(private val context: Context) {
         }
     }
 
+    fun hasFolderPermission(business: Boolean = false): Boolean {
+        if (listDirectPublicStatuses(business).isNotEmpty() || listDirectPublicWaMedia().isNotEmpty()) {
+            return true
+        }
+        val uri = selected(business) ?: return false
+        return resolver.persistedUriPermissions.any { it.uri == uri && it.isReadPermission }
+    }
+
+    fun listWaMedia(): List<MediaRecord> {
+        val combined = LinkedHashMap<String, MediaRecord>()
+        val backupDir = waMediaBackupDir(context)
+
+        // 1. Scan direct public WhatsApp Media folders if readable
+        val directFiles = listDirectPublicWaMedia()
+        for (record in directFiles) {
+            combined[record.name] = record
+        }
+
+        // 2. Scan via persisted SAF tree URI (if granted on Android/media or WhatsApp/Media)
+        for (business in listOf(false, true)) {
+            val uri = selected(business) ?: continue
+            val hasPerm = resolver.persistedUriPermissions.any { it.uri == uri && it.isReadPermission }
+            if (hasPerm) {
+                for (record in queryWaMediaFast(uri, business)) {
+                    combined.putIfAbsent(record.name, record)
+                }
+            }
+        }
+
+        // 3. Back up recent media files (<= 15 MB, up to 40 files) into wa_media_backup
+        // so that if the sender deletes the message ("Delete for everyone"), the file survives!
+        val recentToBackup = combined.values
+            .sortedByDescending { it.modifiedAt }
+            .take(40)
+        for (record in recentToBackup) {
+            if (record.size in 1L..(15L * 1024L * 1024L)) {
+                val safeName = record.name.replace(Regex("[^a-zA-Z0-9._-]"), "_")
+                val target = File(backupDir, safeName)
+                if (!target.exists() || target.length() == 0L) {
+                    runCatching {
+                        resolver.openInputStream(record.uri)?.use { input ->
+                            target.outputStream().use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                        if (record.modifiedAt > 0L) {
+                            target.setLastModified(record.modifiedAt)
+                        }
+                    }
+                }
+            }
+        }
+
+        // 4. Include all backed-up files (including ones already deleted from WhatsApp!)
+        backupDir.listFiles()?.mapNotNull(MediaRecord::fromFile)?.forEach { backupRecord ->
+            combined.putIfAbsent(backupRecord.name, backupRecord)
+        }
+
+        // 5. Also include web_statuses / web downloads so media captured from Dual App WebView appears too
+        for (record in listWebStatuses()) {
+            combined.putIfAbsent(record.name, record)
+        }
+
+        return combined.values.sortedByDescending { it.modifiedAt }
+    }
+
+    private fun queryWaMediaFast(treeUri: Uri, business: Boolean): List<MediaRecord> {
+        val treeDocId = runCatching { DocumentsContract.getTreeDocumentId(treeUri) }.getOrNull()
+            ?: return emptyList()
+        val baseMediaDocId = when {
+            treeDocId == "primary:Android/media" -> if (business) {
+                "primary:Android/media/com.whatsapp.w4b/WhatsApp Business/Media"
+            } else {
+                "primary:Android/media/com.whatsapp/WhatsApp/Media"
+            }
+            treeDocId.endsWith("/Media") -> treeDocId
+            treeDocId.endsWith("/.Statuses") -> treeDocId.removeSuffix("/.Statuses")
+            else -> return emptyList()
+        }
+        val prefix = if (business) "WhatsApp Business" else "WhatsApp"
+        val subfolders = listOf(
+            "$prefix Images",
+            "$prefix Video",
+            "$prefix Audio",
+            "$prefix Documents",
+            "$prefix Voice Notes",
+        )
+        val results = ArrayList<MediaRecord>()
+        for (sub in subfolders) {
+            val subDocId = "$baseMediaDocId/$sub"
+            val isVoiceNotes = sub.endsWith("Voice Notes")
+            queryFolderDocuments(treeUri, subDocId, recurseOneLevel = isVoiceNotes, out = results)
+        }
+        return results
+    }
+
+    private fun queryFolderDocuments(
+        treeUri: Uri,
+        folderDocId: String,
+        recurseOneLevel: Boolean,
+        out: MutableList<MediaRecord>,
+    ) {
+        val childrenUri = runCatching {
+            DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, folderDocId)
+        }.getOrNull() ?: return
+
+        val projection = arrayOf(
+            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            DocumentsContract.Document.COLUMN_MIME_TYPE,
+            DocumentsContract.Document.COLUMN_SIZE,
+            DocumentsContract.Document.COLUMN_LAST_MODIFIED,
+        )
+        val subDirs = ArrayList<String>()
+        try {
+            val cursor = resolver.query(childrenUri, projection, null, null, null) ?: return
+            cursor.use { c ->
+                val idCol = c.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                val nameCol = c.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                val mimeCol = c.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
+                val sizeCol = c.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE)
+                val modCol = c.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
+                while (c.moveToNext()) {
+                    val docId = if (idCol >= 0) c.getString(idCol) else null
+                    val name = if (nameCol >= 0) c.getString(nameCol) else null
+                    val mime = if (mimeCol >= 0) c.getString(mimeCol) else null
+                    val size = if (sizeCol >= 0) c.getLong(sizeCol) else 0L
+                    val modified = if (modCol >= 0) c.getLong(modCol) else 0L
+                    if (docId.isNullOrBlank() || name.isNullOrBlank() || mime.isNullOrBlank()) continue
+                    if (name.startsWith(".") || name.equals("Sent", ignoreCase = true) || name.equals("Private", ignoreCase = true)) {
+                        continue
+                    }
+                    if (mime == DocumentsContract.Document.MIME_TYPE_DIR) {
+                        if (recurseOneLevel) subDirs.add(docId)
+                        continue
+                    }
+                    if (size <= 0L) continue
+                    val docUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
+                    out.add(MediaRecord(docUri, name, mime, size, modified))
+                }
+            }
+        } catch (_: Exception) {
+            return
+        }
+        if (recurseOneLevel) {
+            for (subDir in subDirs) {
+                queryFolderDocuments(treeUri, subDir, recurseOneLevel = false, out = out)
+            }
+        }
+    }
+
+    private fun listDirectPublicWaMedia(): List<MediaRecord> {
+        val ext = runCatching { Environment.getExternalStorageDirectory() }.getOrNull() ?: return emptyList()
+        val roots = listOf(
+            File(ext, "Android/media/com.whatsapp/WhatsApp/Media") to "WhatsApp",
+            File(ext, "WhatsApp/Media") to "WhatsApp",
+            File(ext, "Android/media/com.whatsapp.w4b/WhatsApp Business/Media") to "WhatsApp Business",
+            File(ext, "WhatsApp Business/Media") to "WhatsApp Business",
+        )
+        val out = ArrayList<MediaRecord>()
+        for ((mediaRoot, prefix) in roots) {
+            if (!mediaRoot.isDirectory || !mediaRoot.canRead()) continue
+            val subfolders = listOf(
+                "$prefix Images",
+                "$prefix Video",
+                "$prefix Audio",
+                "$prefix Documents",
+                "$prefix Voice Notes",
+            )
+            for (sub in subfolders) {
+                val dir = File(mediaRoot, sub)
+                if (!dir.isDirectory || !dir.canRead()) continue
+                val children = dir.listFiles().orEmpty()
+                for (child in children) {
+                    if (child.name.startsWith(".") ||
+                        child.name.equals("Sent", ignoreCase = true) ||
+                        child.name.equals("Private", ignoreCase = true)
+                    ) continue
+                    if (child.isDirectory && sub.endsWith("Voice Notes")) {
+                        child.listFiles()?.mapNotNull(MediaRecord::fromFile)?.let(out::addAll)
+                    } else if (child.isFile) {
+                        MediaRecord.fromFile(child)?.let(out::add)
+                    }
+                }
+            }
+        }
+        return out
+    }
+
     fun find(id: String, business: Boolean): MediaRecord = list(business).firstOrNull {
         it.uri.toString() == id
     } ?: findInSelected(id)
@@ -120,12 +309,18 @@ internal class StatusFolders(private val context: Context) {
 
     fun findInSelected(id: String): MediaRecord? {
         listWebStatuses().firstOrNull { it.uri.toString() == id }?.let { return it }
+        waMediaBackupDir(context).listFiles()?.mapNotNull(MediaRecord::fromFile)
+            ?.firstOrNull { it.uri.toString() == id }?.let { return it }
+        listDirectPublicWaMedia().firstOrNull { it.uri.toString() == id }?.let { return it }
         for (business in listOf(false, true)) {
             listDirectPublicStatuses(business).firstOrNull { it.uri.toString() == id }?.let { return it }
             val selected = selected(business) ?: continue
-            if (Uri.parse(id).authority != selected.authority) continue
+            val parsed = Uri.parse(id)
+            if (parsed.authority != selected.authority) continue
             val match = runCatching { list(business) }.getOrDefault(emptyList())
                 .firstOrNull { it.uri.toString() == id }
+                ?: runCatching { queryWaMediaFast(selected, business) }.getOrDefault(emptyList())
+                    .firstOrNull { it.uri.toString() == id }
             if (match != null) return match
         }
         return null
@@ -199,5 +394,8 @@ internal class StatusFolders(private val context: Context) {
     companion object {
         fun webStatusDir(context: Context): File =
             File(context.filesDir, "web_statuses").apply { mkdirs() }
+
+        fun waMediaBackupDir(context: Context): File =
+            File(context.filesDir, "wa_media_backup").apply { mkdirs() }
     }
 }

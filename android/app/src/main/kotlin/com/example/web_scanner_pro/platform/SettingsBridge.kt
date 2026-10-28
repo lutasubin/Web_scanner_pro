@@ -16,7 +16,7 @@ class SettingsBridge(context: Context) {
                 "showHomeHand" to preferences.getBoolean("showHomeHand", true),
                 "shownNotifyDialog" to preferences.getBoolean("shownNotifyDialog", false),
                 "shownStorageDialog" to preferences.getBoolean("shownStorageDialog", false),
-                "captureEnabled" to preferences.getBoolean("captureEnabled", false)
+                "captureEnabled" to preferences.getBoolean("captureEnabled", true)
             ))
             "updateSettings" -> update(call, result)
             else -> return false

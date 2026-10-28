@@ -23,6 +23,7 @@ class _DeletedMediaPageState extends State<DeletedMediaPage>
   late final TabController _tabController;
   final List<MediaRecord> _allItems = [];
   bool _loading = false;
+  bool _hasFolderPermission = false;
   int _activeTabIndex = 0;
   int _bannerReloadCount = 0;
 
@@ -40,6 +41,9 @@ class _DeletedMediaPageState extends State<DeletedMediaPage>
     WidgetsBinding.instance.addObserver(this);
     _tabController = TabController(length: _tabs.length, vsync: this)
       ..addListener(_onTabChanged);
+    if (services.isRegistered<AppPlatform>()) {
+      services<AppPlatform>().addStatusesChangedListener(_loadMedia);
+    }
     _initAndLoad();
   }
 
@@ -63,6 +67,7 @@ class _DeletedMediaPageState extends State<DeletedMediaPage>
         await showStoragePermissionOnboardingDialog(
           context,
           onAllow: _selectFolder,
+          isDeletedMedia: true,
         );
         if (mounted) {
           setState(() => _bannerReloadCount++);
@@ -73,6 +78,9 @@ class _DeletedMediaPageState extends State<DeletedMediaPage>
 
   @override
   void dispose() {
+    if (services.isRegistered<AppPlatform>()) {
+      services<AppPlatform>().removeStatusesChangedListener(_loadMedia);
+    }
     WidgetsBinding.instance.removeObserver(this);
     _tabController.dispose();
     super.dispose();
@@ -88,19 +96,22 @@ class _DeletedMediaPageState extends State<DeletedMediaPage>
     setState(() => _loading = true);
     try {
       final platform = services<AppPlatform>();
-      final statuses = (await platform.readList(
-        'listStatuses',
-        {'business': false},
+      final hasPerm = await platform.invoke<bool>('hasFolderPermission', {
+        'business': false,
+      }) ?? false;
+      final waMedia = (await platform.readList(
+        'listWaMedia',
       )).map(MediaRecord.fromMap);
       final files = (await platform.readList(
         'listFiles',
       )).map(MediaRecord.fromMap);
       final byId = <String, MediaRecord>{};
-      for (final item in [...files, ...statuses]) {
+      for (final item in [...files, ...waMedia]) {
         byId[item.id] = item;
       }
       if (mounted) {
         setState(() {
+          _hasFolderPermission = hasPerm;
           _allItems
             ..clear()
             ..addAll(byId.values);
@@ -115,7 +126,7 @@ class _DeletedMediaPageState extends State<DeletedMediaPage>
   Future<void> _selectFolder() async {
     if (!services.isRegistered<AppPlatform>()) return;
     try {
-      await services<AppPlatform>().invoke<void>('selectStatusTree', {
+      await services<AppPlatform>().invoke<void>('selectStatusFolder', {
         'business': false,
       });
       await _loadMedia();
@@ -125,7 +136,10 @@ class _DeletedMediaPageState extends State<DeletedMediaPage>
   void _openGuide() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => GuideStoragePage(onAllowFolder: _selectFolder),
+        builder: (_) => GuideStoragePage(
+          onAllowFolder: _selectFolder,
+          isDeletedMedia: true,
+        ),
       ),
     );
   }
@@ -303,8 +317,9 @@ class _DeletedMediaPageState extends State<DeletedMediaPage>
             ),
           ),
           // Bottom floating bar matching `orig_del_chat_sample.png`
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 6, 16, 14),
+          if (!_hasFolderPermission)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 14),
             child: Material(
               color: Colors.white,
               elevation: 4,

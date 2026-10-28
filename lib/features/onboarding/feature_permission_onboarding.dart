@@ -99,6 +99,7 @@ Future<bool?> showNotifyPermissionOnboardingDialog(
 Future<bool?> showStoragePermissionOnboardingDialog(
   BuildContext context, {
   required VoidCallback onAllow,
+  bool isDeletedMedia = false,
 }) => showDialog<bool>(
   context: context,
   barrierDismissible: true,
@@ -143,10 +144,12 @@ Future<bool?> showStoragePermissionOnboardingDialog(
             ),
           ),
           const SizedBox(height: 10),
-          const Text(
-            'Để lưu trạng thái thành công, vui lòng cho phép ứng dụng SỬ DỤNG THƯ MỤC NÀY.',
+          Text(
+            isDeletedMedia
+                ? 'CẦN SỬ DỤNG THƯ MỤC NÀY để phát hiện và khôi phục các tin nhắn phương tiện đã bị xóa.'
+                : 'Để lưu trạng thái thành công, vui lòng cho phép ứng dụng SỬ DỤNG THƯ MỤC NÀY.',
             textAlign: TextAlign.center,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 14,
               color: Color(0xFF767E7A),
               height: 1.4,
@@ -616,9 +619,14 @@ class _GuideNotifyPageState extends State<GuideNotifyPage> {
 
 /// Matches original app's `GuideStorageActivity` (`activity_guide_storage.xml`)
 class GuideStoragePage extends StatelessWidget {
-  const GuideStoragePage({super.key, required this.onAllowFolder});
+  const GuideStoragePage({
+    super.key,
+    required this.onAllowFolder,
+    this.isDeletedMedia = false,
+  });
 
   final VoidCallback onAllowFolder;
+  final bool isDeletedMedia;
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -670,9 +678,11 @@ class GuideStoragePage extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 8),
-                    const Text(
-                      'Cần SỬ DỤNG THƯ MỤC NÀY để phát hiện và lưu các ảnh, video trạng thái từ WhatsApp.',
-                      style: TextStyle(
+                    Text(
+                      isDeletedMedia
+                          ? 'CẦN SỬ DỤNG THƯ MỤC NÀY để phát hiện và khôi phục các tin nhắn phương tiện đã bị xóa.'
+                          : 'Cần SỬ DỤNG THƯ MỤC NÀY để phát hiện và lưu các ảnh, video trạng thái từ WhatsApp.',
+                      style: const TextStyle(
                         fontSize: 13.5,
                         color: Color(0xFF767E7A),
                         height: 1.35,
@@ -712,71 +722,133 @@ class GuideStoragePage extends StatelessWidget {
               ),
               const SizedBox(height: 12),
 
-              // Card 2: Xem & Lưu Trạng thái (`guide_status_1.webp` & `guide_status_2.webp`)
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Row(
-                      children: [
-                        _StepNumberBadge(number: '2'),
-                        SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'Xem & Lưu Trạng thái',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                              color: Color(0xFF1C1F1D),
+              if (isDeletedMedia)
+                // Card 2 (type = 1 in GuideStorageActivity): Bật tự động tải phương tiện
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          _StepNumberBadge(number: '2'),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Bật tự động tải phương tiện',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF1C1F1D),
+                              ),
                             ),
                           ),
+                        ],
+                      ),
+                      SizedBox(height: 16),
+                      _TimelineStepRow(
+                        step: '1',
+                        text: 'Mở ứng dụng WA',
+                        isLast: false,
+                      ),
+                      _TimelineStepRow(
+                        step: '2',
+                        text: 'Nhấn ‘⋮’ ở góc trên bên phải',
+                        isLast: false,
+                      ),
+                      _TimelineStepRow(
+                        step: '3',
+                        text: 'Nhấn ‘Cài đặt’ ở dưới cùng',
+                        isLast: false,
+                      ),
+                      _TimelineStepRow(
+                        step: '4',
+                        text: 'Nhấn ‘Bộ nhớ và dữ liệu’',
+                        isLast: false,
+                      ),
+                      _TimelineStepRow(
+                        step: '5',
+                        text: 'Tìm ‘Phương tiện được tải xuống tự động’ ở cuối trang',
+                        isLast: false,
+                      ),
+                      _TimelineStepRow(
+                        step: '6',
+                        text: 'Nhấn từng tùy chọn để chọn loại phương tiện cần khôi phục',
+                        isLast: true,
+                      ),
+                    ],
+                  ),
+                )
+              else
+                // Card 2 (type = 2 in GuideStorageActivity): Xem & Lưu Trạng thái (`guide_status_1.webp` & `guide_status_2.webp`)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          _StepNumberBadge(number: '2'),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Xem & Lưu Trạng thái',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF1C1F1D),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      const Text(
+                        'Bước 1: Mở WhatsApp và xem toàn bộ trạng thái.',
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1C1F1D),
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    const Text(
-                      'Bước 1: Mở WhatsApp và xem toàn bộ trạng thái.',
-                      style: TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF1C1F1D),
                       ),
-                    ),
-                    const SizedBox(height: 10),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Image.asset(
-                        'assets/images/guide_status_1.webp',
-                        width: double.infinity,
-                        fit: BoxFit.cover,
+                      const SizedBox(height: 10),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.asset(
+                          'assets/images/guide_status_1.webp',
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Bước 2: Quay lại đây, mở hình ảnh và nhấn nút lưu.',
-                      style: TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF1C1F1D),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Bước 2: Quay lại đây, mở hình ảnh và nhấn nút lưu.',
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1C1F1D),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 10),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Image.asset(
-                        'assets/images/guide_status_2.webp',
-                        width: double.infinity,
-                        fit: BoxFit.cover,
+                      const SizedBox(height: 10),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Image.asset(
+                          'assets/images/guide_status_2.webp',
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
             ],
           ),
         ),

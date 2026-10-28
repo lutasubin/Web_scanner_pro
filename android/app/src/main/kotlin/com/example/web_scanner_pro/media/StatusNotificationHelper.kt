@@ -18,11 +18,14 @@ import com.example.web_scanner_pro.R
 object StatusNotificationHelper {
     private const val MEDIA_CHANNEL_ID = "media"
     private const val MEDIA_CHANNEL_NAME = "New Message"
+    private const val MESSAGE_CHANNEL_ID = "message"
+    private const val MESSAGE_CHANNEL_NAME = "New Message"
     private const val SERVICE_CHANNEL_ID = "service"
     private const val SERVICE_CHANNEL_NAME = "Recover Media"
 
     const val SERVICE_NOTIFICATION_ID = 1
     private const val STATUS_NOTIFICATION_ID = 111
+    private const val MESSAGE_NOTIFICATION_ID = 1011
     private const val LEGACY_CANCEL_ID = 1012
 
     fun canPostNotifications(context: Context): Boolean {
@@ -119,6 +122,60 @@ object StatusNotificationHelper {
         runCatching {
             manager.cancel(LEGACY_CANCEL_ID)
             manager.notify(STATUS_NOTIFICATION_ID, notification)
+        }
+    }
+
+    fun notifyNewMessage(context: Context) {
+        if (!canPostNotifications(context)) return
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager ?: return
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                MESSAGE_CHANNEL_ID,
+                MESSAGE_CHANNEL_NAME,
+                NotificationManager.IMPORTANCE_DEFAULT,
+            ).apply {
+                setSound(null, null)
+                enableVibration(false)
+            }
+            manager.createNotificationChannel(channel)
+        }
+
+        val titleText = context.getString(R.string.message_title)
+        val contentText = context.getString(R.string.observer_notification_message)
+        val remoteViews = RemoteViews(context.packageName, R.layout.custom_notification).apply {
+            setTextViewText(R.id.title, titleText)
+            setTextViewText(R.id.content, contentText)
+        }
+
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra("open_route", "/history")
+        }
+        val pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT or
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            3,
+            intent,
+            pendingFlags,
+        )
+
+        val notification = NotificationCompat.Builder(context, MESSAGE_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification_origin)
+            .setContentTitle(titleText)
+            .setContentText(contentText)
+            .setCustomContentView(remoteViews)
+            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setAutoCancel(true)
+            .setSilent(true)
+            .setContentIntent(pendingIntent)
+            .build()
+
+        runCatching {
+            manager.cancel(MESSAGE_NOTIFICATION_ID)
+            manager.notify(MESSAGE_NOTIFICATION_ID, notification)
         }
     }
 }

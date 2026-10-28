@@ -11,6 +11,7 @@ import com.example.web_scanner_pro.ads.DualAppNativeAdManager
 import com.example.web_scanner_pro.ads.DualAppNativeFactory
 import com.example.web_scanner_pro.ads.WebScannerNativeAdFactory
 import com.example.web_scanner_pro.history.HistoryBridge
+import com.example.web_scanner_pro.history.NotificationCaptureService
 import com.example.web_scanner_pro.media.MediaBridge
 import com.example.web_scanner_pro.media.StatusMonitorService
 import com.example.web_scanner_pro.platform.DirectChatBridge
@@ -29,12 +30,18 @@ class MainActivity : FlutterActivity() {
             platformChannel?.invokeMethod("onStatusesUpdated", null)
         }
     }
+    private val historyUpdateListener: () -> Unit = {
+        runCatching {
+            platformChannel?.invokeMethod("onHistoryUpdated", null)
+        }
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         ensurePostNotificationsPermission()
         StatusMonitorService.ensureRunning(this)
         StatusMonitorService.addListener(statusUpdateListener)
+        NotificationCaptureService.onHistoryUpdated = historyUpdateListener
         WebScannerNativeAdFactory.registerAll(flutterEngine, layoutInflater)
         flutterEngine
             .platformViewsController
@@ -131,6 +138,9 @@ class MainActivity : FlutterActivity() {
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
         StatusMonitorService.removeListener(statusUpdateListener)
+        if (NotificationCaptureService.onHistoryUpdated === historyUpdateListener) {
+            NotificationCaptureService.onHistoryUpdated = null
+        }
         platformChannel = null
         WebScannerNativeAdFactory.unregisterAll(flutterEngine)
         super.cleanUpFlutterEngine(flutterEngine)
@@ -138,6 +148,9 @@ class MainActivity : FlutterActivity() {
 
     override fun onDestroy() {
         StatusMonitorService.removeListener(statusUpdateListener)
+        if (NotificationCaptureService.onHistoryUpdated === historyUpdateListener) {
+            NotificationCaptureService.onHistoryUpdated = null
+        }
         if (::media.isInitialized) media.dispose()
         super.onDestroy()
     }

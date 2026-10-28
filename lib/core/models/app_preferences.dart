@@ -8,7 +8,7 @@ class AppPreferences {
     this.showHomeHand = true,
     this.shownNotifyDialog = false,
     this.shownStorageDialog = false,
-    this.captureEnabled = false,
+    this.captureEnabled = true,
   });
 
   factory AppPreferences.fromMap(Map<Object?, Object?> map) => AppPreferences(
@@ -18,7 +18,7 @@ class AppPreferences {
     showHomeHand: map['showHomeHand'] as bool? ?? true,
     shownNotifyDialog: map['shownNotifyDialog'] as bool? ?? false,
     shownStorageDialog: map['shownStorageDialog'] as bool? ?? false,
-    captureEnabled: map['captureEnabled'] as bool? ?? false,
+    captureEnabled: map['captureEnabled'] as bool? ?? true,
   );
 
   final String theme;

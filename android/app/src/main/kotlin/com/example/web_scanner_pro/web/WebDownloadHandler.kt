@@ -7,10 +7,15 @@ import android.util.Base64
 import android.webkit.JavascriptInterface
 import android.webkit.URLUtil
 import android.webkit.WebView
+import com.example.web_scanner_pro.history.HistoryDispatch
+import com.example.web_scanner_pro.history.HistoryMessage
+import com.example.web_scanner_pro.history.HistoryStore
+import com.example.web_scanner_pro.history.NotificationCaptureService
 import com.example.web_scanner_pro.media.OwnedDownloads
 import com.example.web_scanner_pro.media.PendingDownload
 import com.example.web_scanner_pro.media.StatusFolders
 import com.example.web_scanner_pro.media.StatusMonitorService
+import com.example.web_scanner_pro.media.StatusNotificationHelper
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
@@ -209,6 +214,40 @@ internal class WebDownloadHandler(
                 if (!cacheOnly) {
                     post("Không lưu được trạng thái. Hãy thử lại.")
                 }
+            }
+        }
+        return true
+    }
+
+    @JavascriptInterface
+    fun saveIncomingMessage(title: String, body: String, msgKey: String, notifyUser: Boolean): Boolean {
+        val cleanTitle = title.trim().take(300)
+        val cleanBody = body.trim().take(6000)
+        if (cleanTitle.isEmpty() || cleanBody.isEmpty()) return false
+        val settings = appContext.getSharedPreferences("web_scanner_settings", Context.MODE_PRIVATE)
+        if (!settings.getBoolean("captureEnabled", true)) return false
+        HistoryDispatch.worker.execute {
+            try {
+                val raw = "com.whatsapp\u0000${msgKey.ifBlank { "$cleanTitle:$cleanBody" }}"
+                val id = MessageDigest.getInstance("SHA-256").digest(raw.toByteArray(Charsets.UTF_8))
+                    .joinToString("") { "%02x".format(it) }
+                val existing = HistoryStore(appContext).list()
+                val alreadySaved = existing.any { it.id == id }
+                if (!alreadySaved) {
+                    val msg = HistoryMessage(
+                        id = id,
+                        title = cleanTitle,
+                        body = cleanBody,
+                        packageName = "com.whatsapp",
+                        receivedAt = System.currentTimeMillis(),
+                    )
+                    HistoryStore(appContext).append(listOf(msg))
+                    if (notifyUser) {
+                        StatusNotificationHelper.notifyNewMessage(appContext)
+                    }
+                    NotificationCaptureService.dispatchHistoryUpdated()
+                }
+            } catch (_: Exception) {
             }
         }
         return true

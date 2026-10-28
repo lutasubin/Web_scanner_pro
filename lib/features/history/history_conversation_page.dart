@@ -140,49 +140,22 @@ class HistoryConversationPage extends StatelessWidget {
               child: Text('Không còn tin nhắn trong cuộc trò chuyện này.'),
             );
           }
-          return Column(
-            children: [
-              Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 24),
-                  itemCount: items.length,
-                  itemBuilder: (context, index) {
-                    final msg = items[index];
-                    return _MessageBubble(
-                      message: msg,
-                      showDelete: !_isSample,
-                      onCopy: () => _copyText(context, msg.body),
-                      onDelete: () => controller.deleteMessage(msg.id),
-                    );
-                  },
-                ),
-              ),
-              if (_isSample && onOpenGuide != null)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: FilledButton(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF08C567),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed: onOpenGuide,
-                      child: const Text(
-                        'View the Guide',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-            ],
+          return ListView.builder(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 24),
+            itemCount: items.length,
+            itemBuilder: (context, index) {
+              final msg = items[index];
+              final isLastSample = _isSample && index == items.length - 1;
+              return _MessageBubble(
+                message: msg,
+                isSample: _isSample,
+                showDelete: !_isSample,
+                onCopy: () => _copyText(context, msg.body),
+                onDelete: () => controller.deleteMessage(msg.id),
+                onActionTap: isLastSample ? onOpenGuide : null,
+                actionLabel: isLastSample ? '👉Xem hướng dẫn' : null,
+              );
+            },
           );
         }),
       ),
@@ -194,15 +167,21 @@ class HistoryConversationPage extends StatelessWidget {
 class _MessageBubble extends StatelessWidget {
   const _MessageBubble({
     required this.message,
+    this.isSample = false,
     required this.showDelete,
     required this.onCopy,
     required this.onDelete,
+    this.onActionTap,
+    this.actionLabel,
   });
 
   final HistoryMessage message;
+  final bool isSample;
   final bool showDelete;
   final VoidCallback onCopy;
   final VoidCallback onDelete;
+  final VoidCallback? onActionTap;
+  final String? actionLabel;
 
   @override
   Widget build(BuildContext context) => Align(
@@ -228,9 +207,9 @@ class _MessageBubble extends StatelessWidget {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: onCopy,
+        onTap: onActionTap ?? onCopy,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 9, 12, 7),
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -241,50 +220,76 @@ class _MessageBubble extends StatelessWidget {
                   color: Color(0xFF1E2622),
                   height: 1.35,
                 ),
-                onTap: onCopy,
+                onTap: onActionTap ?? onCopy,
               ),
-              const SizedBox(height: 4),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    message.formattedTime,
-                    style: const TextStyle(
-                      fontSize: 11.5,
-                      color: Color(0xFF707D75),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  InkWell(
-                    onTap: onCopy,
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                      child: Icon(
-                        Icons.copy_rounded,
-                        size: 14,
-                        color: Color(0xFF008A5E),
+              if (!isSample) ...[
+                const SizedBox(height: 4),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      message.formattedTime,
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        color: Color(0xFF707D75),
                       ),
                     ),
-                  ),
-                  if (showDelete) ...[
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 10),
                     InkWell(
-                      onTap: onDelete,
+                      onTap: onCopy,
                       child: const Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 4,
-                          vertical: 2,
-                        ),
+                        padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                         child: Icon(
-                          Icons.delete_outline_rounded,
-                          size: 15,
-                          color: Color(0xFFD32F2F),
+                          Icons.copy_rounded,
+                          size: 14,
+                          color: Color(0xFF008A5E),
                         ),
                       ),
                     ),
+                    if (showDelete) ...[
+                      const SizedBox(width: 4),
+                      InkWell(
+                        onTap: onDelete,
+                        child: const Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 2,
+                          ),
+                          child: Icon(
+                            Icons.delete_outline_rounded,
+                            size: 15,
+                            color: Color(0xFFD32F2F),
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
-                ],
-              ),
+                ),
+              ],
+              if (onActionTap != null && actionLabel != null) ...[
+                const SizedBox(height: 12),
+                const Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: Color(0xFFE6E6E6),
+                ),
+                InkWell(
+                  onTap: onActionTap,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 10, bottom: 2),
+                    child: Center(
+                      child: Text(
+                        actionLabel!,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF08C567),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),

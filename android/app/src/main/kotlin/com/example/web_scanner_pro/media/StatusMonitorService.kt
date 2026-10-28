@@ -164,6 +164,17 @@ class StatusMonitorService : Service() {
                 }
             }
         }
+        val waMediaRecords = runCatching { folders.listWaMedia() }.getOrDefault(emptyList())
+        val currentWaMediaNames = waMediaRecords.mapTo(HashSet()) { it.name }
+        val waMediaChanged = synchronized(seenWaMediaNames) {
+            if (seenWaMediaNames != currentWaMediaNames) {
+                seenWaMediaNames.clear()
+                seenWaMediaNames.addAll(currentWaMediaNames)
+                true
+            } else {
+                false
+            }
+        }
 
         if (!initialSnapshotReady) {
             seenStatusNames.addAll(currentNames)
@@ -185,7 +196,7 @@ class StatusMonitorService : Service() {
                 StatusNotificationHelper.notifyNewStatus(appContext)
             }
             dispatchStatusesUpdated()
-        } else if (removed) {
+        } else if (removed || waMediaChanged) {
             dispatchStatusesUpdated()
         }
     }
@@ -195,6 +206,8 @@ class StatusMonitorService : Service() {
         private val mainHandler = Handler(Looper.getMainLooper())
         private val listeners = CopyOnWriteArraySet<() -> Unit>()
         private val seenStatusNames: MutableSet<String> =
+            Collections.synchronizedSet(HashSet<String>())
+        private val seenWaMediaNames: MutableSet<String> =
             Collections.synchronizedSet(HashSet<String>())
         @Volatile
         private var initialSnapshotReady = false

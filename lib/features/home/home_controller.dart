@@ -6,6 +6,7 @@ import '../../core/di/di.dart';
 import '../../core/platform/app_platform.dart';
 import '../../core/repositories/preferences_repository.dart';
 import '../../core/viewmodels/task_controller.dart';
+import '../history/history_controller.dart';
 import '../sessions/web_session.dart';
 import '../statuses/statuses_controller.dart';
 
@@ -36,6 +37,9 @@ class HomeController extends TaskController {
     if (Get.currentRoute == route) {
       if (Get.isRegistered<StatusesController>()) {
         await Get.find<StatusesController>().load();
+      }
+      if (Get.isRegistered<HistoryController>()) {
+        await Get.find<HistoryController>().reload();
       }
       return;
     }

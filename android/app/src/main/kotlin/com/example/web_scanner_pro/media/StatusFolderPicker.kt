@@ -18,11 +18,9 @@ internal class StatusFolderPicker(private val activity: Activity, private val fo
         }
         pending = result
         pendingBusiness = business
-        val defaultTreeUri = if (business) {
-            Uri.parse("content://com.android.externalstorage.documents/document/primary%3AAndroid%2Fmedia%2Fcom.whatsapp.w4b%2FWhatsApp%20Business%2FMedia%2F.Statuses")
-        } else {
-            Uri.parse("content://com.android.externalstorage.documents/document/primary%3AAndroid%2Fmedia%2Fcom.whatsapp%2FWhatsApp%2FMedia%2F.Statuses")
-        }
+        val defaultTreeUri = Uri.parse(
+            "content://com.android.externalstorage.documents/document/primary%3AAndroid%2Fmedia",
+        )
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
             putExtra(Intent.EXTRA_LOCAL_ONLY, true)

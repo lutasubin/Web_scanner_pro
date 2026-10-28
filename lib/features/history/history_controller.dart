@@ -23,38 +23,56 @@ class HistoryController extends TaskController {
   final selectionMode = false.obs;
   final selectedKeys = <String>{}.obs;
   final sampleDismissed = false.obs;
+  bool _pendingRealtimeReload = false;
 
   bool get enabled => _preferences.value.value.captureEnabled;
+
+  @override
+  void onInit() {
+    super.onInit();
+    _platform.addHistoryChangedListener(_onRealtimeHistoryChanged);
+  }
+
+  @override
+  void onClose() {
+    _platform.removeHistoryChangedListener(_onRealtimeHistoryChanged);
+    super.onClose();
+  }
+
+  void _onRealtimeHistoryChanged() {
+    if (busy.value) {
+      _pendingRealtimeReload = true;
+      return;
+    }
+    reload();
+  }
 
   static final List<HistoryMessage> sampleMessages = <HistoryMessage>[
     const HistoryMessage(
       id: 'sample_1',
       title: sampleTitle,
-      body: '👋 Chào mừng bạn đến với tính năng Khôi phục Tin nhắn Đã xóa!',
+      body: 'Bạn muốn xem những tin nhắn đã bị xóa từ người khác?',
       packageName: samplePackage,
       receivedAt: 1730000100000,
     ),
     const HistoryMessage(
       id: 'sample_2',
       title: sampleTitle,
-      body:
-          '1️⃣ Bật quyền Truy cập Thông báo (Notification Access) ở thanh bên dưới để ứng dụng tự động ghi nhận tin nhắn đến.',
+      body: 'Ôi! Bạn đã lỡ tay xóa tin nhắn?',
       packageName: samplePackage,
       receivedAt: 1730000160000,
     ),
     const HistoryMessage(
       id: 'sample_3',
       title: sampleTitle,
-      body:
-          '2️⃣ Đảm bảo cuộc trò chuyện trên WhatsApp không bị tắt tiếng (Mute) để thông báo có thể xuất hiện.',
+      body: 'Muốn đọc tin nhắn mà không cần mở WhatsApp?',
       packageName: samplePackage,
       receivedAt: 1730000220000,
     ),
     const HistoryMessage(
       id: 'sample_4',
       title: sampleTitle,
-      body:
-          'No worries—just follow the guide, and you’ll never miss any deleted messages!',
+      body: 'Đừng lo — chỉ cần làm theo hướng dẫn là xong!',
       packageName: samplePackage,
       receivedAt: 1730000280000,
     ),
@@ -101,8 +119,9 @@ class HistoryController extends TaskController {
   }
 
   List<HistoryMessage> messagesFor(String title, String packageName) {
+    final _ = messages.length;
     if (packageName == samplePackage && title == sampleTitle) {
-      return sampleMessages;
+      return sampleDismissed.value ? const <HistoryMessage>[] : sampleMessages;
     }
     final list = messages
         .where((m) => m.title == title && m.packageName == packageName)
@@ -157,13 +176,20 @@ class HistoryController extends TaskController {
 
   void toggleRemindGuide() => showRemindGuide.value = !showRemindGuide.value;
 
-  Future<void> reload() => perform(() async {
-    final capabilities = await _platform.readMap('getCapabilities');
-    access.value = capabilities['notificationAccess'] as bool? ?? false;
-    messages.assignAll(
-      (await _platform.readList('listMessages')).map(HistoryMessage.fromMap),
-    );
-  });
+  Future<void> reload() async {
+    _pendingRealtimeReload = false;
+    await perform(() async {
+      final capabilities = await _platform.readMap('getCapabilities');
+      access.value = capabilities['notificationAccess'] as bool? ?? false;
+      messages.assignAll(
+        (await _platform.readList('listMessages')).map(HistoryMessage.fromMap),
+      );
+    });
+    if (_pendingRealtimeReload) {
+      _pendingRealtimeReload = false;
+      await reload();
+    }
+  }
 
   Future<void> toggle(bool value) => perform(
     () async {

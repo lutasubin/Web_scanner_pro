@@ -14,9 +14,13 @@ class MediaBridge(activity: Activity) {
 
     fun handle(call: MethodCall, result: MethodChannel.Result): Boolean {
         when (call.method) {
-            "selectStatusFolder" -> picker.select(call.argument<Boolean>("business") ?: false, result)
+            "selectStatusFolder", "selectStatusTree" -> picker.select(call.argument<Boolean>("business") ?: false, result)
+            "hasFolderPermission" -> result.success(folders.hasFolderPermission(call.argument<Boolean>("business") ?: false))
             "listStatuses" -> MediaTasks.run(result, {
                 folders.list(call.argument<Boolean>("business") ?: false).map(MediaRecord::toMap)
+            })
+            "listWaMedia" -> MediaTasks.run(result, {
+                folders.listWaMedia().map(MediaRecord::toMap)
             })
             "saveStatus" -> MediaTasks.run(result, {
                 downloads.save(folders.find(id(call), call.argument<Boolean>("business") ?: false))

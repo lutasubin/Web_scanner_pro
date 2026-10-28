@@ -6,6 +6,7 @@ class AppPlatform {
 
   final MethodChannel _channel;
   final Set<VoidCallback> _statusesChangedListeners = <VoidCallback>{};
+  final Set<VoidCallback> _historyChangedListeners = <VoidCallback>{};
   final Set<ValueChanged<String>> _openRouteListeners =
       <ValueChanged<String>>{};
   bool _handlerAttached = false;
@@ -23,6 +24,13 @@ class AppPlatform {
       case 'onStatusesUpdated':
         for (final listener in List<VoidCallback>.from(
           _statusesChangedListeners,
+        )) {
+          listener();
+        }
+        break;
+      case 'onHistoryUpdated':
+        for (final listener in List<VoidCallback>.from(
+          _historyChangedListeners,
         )) {
           listener();
         }
@@ -47,6 +55,15 @@ class AppPlatform {
 
   void removeStatusesChangedListener(VoidCallback listener) {
     _statusesChangedListeners.remove(listener);
+  }
+
+  void addHistoryChangedListener(VoidCallback listener) {
+    _ensureHandlerAttached();
+    _historyChangedListeners.add(listener);
+  }
+
+  void removeHistoryChangedListener(VoidCallback listener) {
+    _historyChangedListeners.remove(listener);
   }
 
   void addOpenRouteListener(ValueChanged<String> listener) {

@@ -121,7 +121,7 @@ object WebMobileLayout {
           document.documentElement.style.setProperty('--width-album-grid-bubble','125px');
           document.body.style.overflowX='hidden';
 
-          var VERSION=20;
+          var VERSION=21;
           if(window.__webScannerMobileLayout&&window.__webScannerMobileLayout.version===VERSION){
             window.__webScannerMobileLayout.refresh();
             return 'updated';
@@ -458,6 +458,64 @@ object WebMobileLayout {
             }
           };
 
+          api.isDeletedPlaceholder=function(txt){
+            var t=(txt||'').trim().toLowerCase();
+            return !t||
+              t.indexOf('tin nhắn này đã bị xóa')!==-1||
+              t.indexOf('bạn đã xóa tin nhắn này')!==-1||
+              t.indexOf('this message was deleted')!==-1||
+              t.indexOf('you deleted this message')!==-1||
+              t.indexOf('đang chờ tin nhắn này')!==-1||
+              t.indexOf('waiting for this message')!==-1;
+          };
+
+          api.syncIncomingMessages=function(){
+            var bridge=window.WebScannerDownloads;
+            if(!bridge||!bridge.saveIncomingMessage)return;
+            if(!window.__webScannerSavedMessages)window.__webScannerSavedMessages={};
+            var main=document.querySelector('#main');
+            if(main){
+              var headerTitleEl=main.querySelector("header span[dir='auto'],header span[title]");
+              var chatTitle=((headerTitleEl&&(headerTitleEl.getAttribute('title')||headerTitleEl.textContent))||'').trim();
+              if(chatTitle){
+                var inRows=Array.from(main.querySelectorAll('div.message-in'));
+                inRows.slice(-15).forEach(function(row){
+                  var dataId=(row.closest('[data-id]')&&row.closest('[data-id]').getAttribute('data-id'))||'';
+                  var copyable=row.querySelector('.copyable-text[data-pre-plain-text]');
+                  var prePlain=(copyable&&copyable.getAttribute('data-pre-plain-text'))||'';
+                  var textEl=row.querySelector('span.selectable-text');
+                  var body=((textEl&&(textEl.innerText||textEl.textContent))||'').trim();
+                  if(!body||api.isDeletedPlaceholder(body))return;
+                  var key=dataId||(chatTitle+'|'+prePlain+'|'+body);
+                  if(!window.__webScannerSavedMessages[key]){
+                    window.__webScannerSavedMessages[key]=true;
+                    bridge.saveIncomingMessage(chatTitle,body,key,false);
+                  }
+                });
+              }
+            }
+            var pane=document.querySelector("#pane-side,[data-testid='chat-list']");
+            if(pane){
+              var rows=Array.from(pane.querySelectorAll("[role='listitem'],[role='row']"));
+              rows.slice(0,12).forEach(function(row){
+                var unreadBadge=row.querySelector("span[aria-label*='chưa đọc'],span[aria-label*='unread']");
+                if(!unreadBadge)return;
+                var titleNode=row.querySelector("span[dir='auto'][title],span[title]");
+                var rTitle=((titleNode&&(titleNode.getAttribute('title')||titleNode.textContent))||'').trim();
+                var spans=Array.from(row.querySelectorAll("span[dir='ltr'],span[dir='auto']")).filter(function(s){
+                  return s!==titleNode&&!s.closest("[aria-label*='chưa đọc'],[aria-label*='unread']");
+                });
+                var preview=((spans.length>0&&(spans[spans.length-1].innerText||spans[spans.length-1].textContent))||'').trim();
+                if(!rTitle||!preview||api.isDeletedPlaceholder(preview))return;
+                var uKey='unread|'+rTitle+'|'+preview;
+                if(!window.__webScannerSavedMessages[uKey]){
+                  window.__webScannerSavedMessages[uKey]=true;
+                  bridge.saveIncomingMessage(rTitle,preview,uKey,true);
+                }
+              });
+            }
+          };
+
           api.markMobileSurfaces=function(){
             var crop=document.querySelector("[data-testid='crop-rotate-button']");
             var tools=crop&&crop.parentElement;
@@ -508,6 +566,7 @@ object WebMobileLayout {
               }
             });
             api.syncStatusPlayer();
+            api.syncIncomingMessages();
 
             requestAnimationFrame(function(){
               var viewport=window.visualViewport;
