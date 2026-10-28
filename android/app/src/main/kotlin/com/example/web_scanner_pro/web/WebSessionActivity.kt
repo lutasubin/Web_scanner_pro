@@ -544,11 +544,7 @@ class WebSessionActivity : ComponentActivity() {
             )
             return
         }
-        val widthDp = (view.width.takeIf { it > 0 } ?: resources.displayMetrics.widthPixels) /
-            resources.displayMetrics.density
-        val scale = (widthDp / 360f).coerceIn(0.9f, 1.18f)
-        val expandedWidth = 100f / scale
-        view.evaluateJavascript(WebMobileLayout.install(scale, expandedWidth), null)
+        view.evaluateJavascript(WebMobileLayout.install(1f, 100f), null)
         view.evaluateJavascript(
             WebMobileLayout.installDualAppObserver(webMode, isKeyboardLocked),
             null,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../core/ads/remote_config_service.dart';
 import '../../core/ads/widgets/app_banner_ad.dart';
@@ -10,56 +11,24 @@ import '../../core/router/app_routes.dart';
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
 
-  void _shareApp(BuildContext context) {
-    const shareText =
-        'Web Scanner - Dual App: Use dual WhatsApp accounts, save statuses & recover deleted messages!';
-    Clipboard.setData(const ClipboardData(text: shareText));
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Copied app share link to clipboard!'),
-        duration: Duration(seconds: 2),
-      ),
-    );
-  }
+  static const _kPlayStoreUrl =
+      'https://play.google.com/store/apps/details?id=com.example.web_scanner_pro';
 
-  void _showContactDialog(BuildContext context) {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text(
-          'Contact Us',
-          style: TextStyle(fontWeight: FontWeight.w800),
+  Future<void> _shareApp(BuildContext context) async {
+    try {
+      await SharePlus.instance.share(
+        ShareParams(text: _kPlayStoreUrl),
+      );
+    } on MissingPluginException {
+      await Clipboard.setData(const ClipboardData(text: _kPlayStoreUrl));
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Copied Google Play link to clipboard!'),
+          duration: Duration(seconds: 2),
         ),
-        content: const Text(
-          'Have feedback or need support?\n\nEmail: support@webscannerdual.app\nWe typically respond within 24 hours.',
-          style: TextStyle(height: 1.45),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Clipboard.setData(
-                const ClipboardData(text: 'support@webscannerdual.app'),
-              );
-              Navigator.of(ctx).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Support email copied!')),
-              );
-            },
-            child: const Text('Copy Email'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF08C567),
-            ),
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
+      );
+    }
   }
 
   void _openDocumentPage(
@@ -118,24 +87,6 @@ class SettingsPage extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               _SettingRowCard(
-                key: const Key('settings-contact'),
-                icon: Icons.mail_outline_rounded,
-                title: 'Contact Us',
-                onTap: () => _showContactDialog(context),
-              ),
-              const SizedBox(height: 12),
-              _SettingRowCard(
-                key: const Key('settings-terms'),
-                icon: Icons.description_outlined,
-                title: 'Term of Service',
-                onTap: () => _openDocumentPage(
-                  context,
-                  title: 'Term of Service',
-                  body: _kTermsOfServiceText,
-                ),
-              ),
-              const SizedBox(height: 12),
-              _SettingRowCard(
                 key: const Key('settings-privacy'),
                 icon: Icons.verified_user_outlined,
                 title: 'Privacy Policy',
@@ -144,13 +95,6 @@ class SettingsPage extends StatelessWidget {
                   title: 'Privacy Policy',
                   body: _kPrivacyPolicyText,
                 ),
-              ),
-              const SizedBox(height: 12),
-              _SettingRowCard(
-                key: const Key('settings-ads-debug'),
-                icon: Icons.ads_click_rounded,
-                title: 'Ads & Remote Config (Test Mode)',
-                onTap: () => Get.toNamed<void>(AppRoutes.adsDebug),
               ),
             ],
           ),
@@ -255,20 +199,6 @@ class _LegalDocumentPage extends StatelessWidget {
     ),
   );
 }
-
-const _kTermsOfServiceText = '''
-1. Acceptance of Terms
-By using Web Scanner - Dual App, you agree to comply with these Terms of Service and all applicable local laws and regulations.
-
-2. Independent Utility
-Web Scanner - Dual App is an independent utility application and is not affiliated with, associated with, authorized by, endorsed by, or in any way officially connected with WhatsApp LLC or Meta Platforms, Inc.
-
-3. Responsible Use
-You are solely responsible for ensuring that you have authorization to link and access any messaging account used within the application.
-
-4. Local Data Processing
-All web sessions, notification backups, and downloaded statuses are stored locally on your device. Removing an account or uninstalling the application permanently deletes its local session data.
-''';
 
 const _kPrivacyPolicyText = '''
 1. Local-First Privacy
