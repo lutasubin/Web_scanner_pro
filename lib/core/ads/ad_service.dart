@@ -6,6 +6,8 @@ import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
+import '../analytics/analytics_service.dart';
+import '../di/di.dart';
 import 'ad_test_ids.dart';
 import 'remote_config_service.dart';
 
@@ -248,6 +250,17 @@ class AdService with WidgetsBindingObserver {
       request: const AdRequest(),
       adLoadCallback: AppOpenAdLoadCallback(
         onAdLoaded: (ad) {
+          ad.onPaidEvent = (ad, valueMicros, precision, currencyCode) {
+            if (services.isRegistered<AnalyticsService>()) {
+              services<AnalyticsService>().logAdRevenue(
+                adFormat: 'app_open',
+                adUnitId: ad.adUnitId,
+                valueMicros: valueMicros,
+                currencyCode: currencyCode,
+                precision: precision.name,
+              );
+            }
+          };
           _appOpenAd = ad;
           _appOpenLoadTime = DateTime.now();
           _isLoadingAppOpen = false;
@@ -360,6 +373,14 @@ class AdService with WidgetsBindingObserver {
         _log('AppOpenAd shown (trigger: $trigger). Replenishing cache...');
         preloadAppOpen();
       },
+      onAdClicked: (ad) {
+        if (services.isRegistered<AnalyticsService>()) {
+          services<AnalyticsService>().logEvent('ad_click', {
+            'ad_format': 'app_open',
+            'trigger': trigger,
+          });
+        }
+      },
       onAdDismissedFullScreenContent: (ad) {
         ad.dispose();
         isShowingFullScreenAd.value = false;
@@ -408,6 +429,17 @@ class AdService with WidgetsBindingObserver {
       request: const AdRequest(),
       adLoadCallback: InterstitialAdLoadCallback(
         onAdLoaded: (ad) {
+          ad.onPaidEvent = (ad, valueMicros, precision, currencyCode) {
+            if (services.isRegistered<AnalyticsService>()) {
+              services<AnalyticsService>().logAdRevenue(
+                adFormat: 'interstitial',
+                adUnitId: ad.adUnitId,
+                valueMicros: valueMicros,
+                currencyCode: currencyCode,
+                precision: precision.name,
+              );
+            }
+          };
           _interstitialAd = ad;
           _isLoadingInterstitial = false;
           interstitialCached.value = true;
@@ -477,6 +509,14 @@ class AdService with WidgetsBindingObserver {
       onAdShowedFullScreenContent: (_) {
         _log('Interstitial [$trigger] shown. Replenishing cache...');
         preloadInterstitial();
+      },
+      onAdClicked: (ad) {
+        if (services.isRegistered<AnalyticsService>()) {
+          services<AnalyticsService>().logEvent('ad_click', {
+            'ad_format': 'interstitial',
+            'trigger': trigger,
+          });
+        }
       },
       onAdDismissedFullScreenContent: (ad) {
         ad.dispose();
@@ -595,6 +635,25 @@ class AdService with WidgetsBindingObserver {
       factoryId: factoryId,
       request: const AdRequest(),
       listener: NativeAdListener(
+        onAdClicked: (ad) {
+          if (services.isRegistered<AnalyticsService>()) {
+            services<AnalyticsService>().logEvent('ad_click', {
+              'ad_format': 'native',
+              'style': s,
+            });
+          }
+        },
+        onPaidEvent: (ad, valueMicros, precision, currencyCode) {
+          if (services.isRegistered<AnalyticsService>()) {
+            services<AnalyticsService>().logAdRevenue(
+              adFormat: 'native',
+              adUnitId: ad.adUnitId,
+              valueMicros: valueMicros,
+              currencyCode: currencyCode,
+              precision: precision.name,
+            );
+          }
+        },
         onAdLoaded: (loadedAd) {
           _nativeLoadingCount[s] = ((_nativeLoadingCount[s] ?? 1) - 1).clamp(
             0,

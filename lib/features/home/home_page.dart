@@ -6,6 +6,7 @@ import '../../core/ads/remote_config_service.dart';
 import '../../core/ads/widgets/app_banner_ad.dart';
 import '../../core/ads/widgets/app_native_ad.dart';
 import '../../core/ads/widgets/exit_app_dialog.dart';
+import '../../core/analytics/analytics_service.dart';
 import '../../core/di/di.dart';
 import '../../core/router/app_routes.dart';
 import '../help/how_to_use_page.dart';
@@ -27,6 +28,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    if (services.isRegistered<AnalyticsService>()) {
+      services<AnalyticsService>().logEvent('MainPage');
+    }
     WidgetsBinding.instance.addObserver(this);
     controller = Get.find<HomeController>();
     controller.load();

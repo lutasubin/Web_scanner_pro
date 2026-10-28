@@ -5,6 +5,7 @@ import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:get/get.dart';
 
 import '../../core/ads/ad_service.dart';
+import '../../core/analytics/analytics_service.dart';
 import '../../core/di/di.dart';
 import '../../core/platform/app_platform.dart';
 import '../../core/repositories/preferences_repository.dart';
@@ -25,6 +26,9 @@ class _SplashPageState extends State<SplashPage>
   @override
   void initState() {
     super.initState();
+    if (services.isRegistered<AnalyticsService>()) {
+      services<AnalyticsService>().logEvent('SplashPage');
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       FlutterNativeSplash.remove();
     });
@@ -42,6 +46,11 @@ class _SplashPageState extends State<SplashPage>
       final pending = await platform.invoke<String>('consumePendingRoute');
       if (!mounted || pending == null || pending.isEmpty) return;
       _navTimer?.cancel();
+      if (services.isRegistered<AnalyticsService>()) {
+        services<AnalyticsService>().logEvent('notification_open', {
+          'route': pending,
+        });
+      }
       if (pending == AppRoutes.splash) {
         return;
       }
@@ -77,6 +86,11 @@ class _SplashPageState extends State<SplashPage>
     try {
       final pending = await platform.invoke<String>('consumePendingRoute');
       if (pending != null && pending.isNotEmpty) {
+        if (services.isRegistered<AnalyticsService>()) {
+          services<AnalyticsService>().logEvent('notification_open', {
+            'route': pending,
+          });
+        }
         if (pending == AppRoutes.splash) {
           return;
         }

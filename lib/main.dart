@@ -8,6 +8,7 @@ import 'package:get/get.dart';
 import 'app.dart';
 import 'core/ads/ad_service.dart';
 import 'core/ads/remote_config_service.dart';
+import 'core/analytics/analytics_service.dart';
 import 'core/di/di.dart';
 import 'core/localization/app_translations.dart';
 import 'core/repositories/preferences_repository.dart';
@@ -46,6 +47,9 @@ Future<void> _initFirebaseAndRemoteConfig() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    if (services.isRegistered<AnalyticsService>()) {
+      unawaited(services<AnalyticsService>().flushPending());
+    }
     await services<RemoteConfigService>().init();
   } catch (_) {}
 }

@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 import '../../core/ads/remote_config_service.dart';
 import '../../core/ads/widgets/app_native_ad.dart';
+import '../../core/analytics/analytics_service.dart';
 import '../../core/di/di.dart';
 import '../../core/repositories/preferences_repository.dart';
 import '../../core/router/app_routes.dart';
@@ -100,6 +101,9 @@ class _LanguagePageState extends State<LanguagePage> {
   @override
   void initState() {
     super.initState();
+    if (services.isRegistered<AnalyticsService>()) {
+      services<AnalyticsService>().logEvent('LanguagePage');
+    }
     _prefs = services<PreferencesRepository>();
     _selectedCode = _prefs.value.value.languageCode;
     final args = Get.arguments;

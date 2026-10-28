@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/analytics/analytics_service.dart';
+import '../../core/di/di.dart';
 import '../../core/platform/app_platform.dart';
 import '../../core/viewmodels/task_controller.dart';
 
@@ -92,13 +94,16 @@ class DirectChatController extends TaskController {
     );
   }
 
-  Future<void> launch() => perform(
-    () => _platform.invoke<void>('openDirectChat', {
+  Future<void> launch() => perform(() async {
+    if (services.isRegistered<AnalyticsService>()) {
+      services<AnalyticsService>().logEvent('direct_chat');
+    }
+    await _platform.invoke<void>('openDirectChat', {
       'phone': normalize(phone.text),
       'message': message.text,
       'business': business,
-    }),
-  );
+    });
+  });
 
   @override
   void onClose() {

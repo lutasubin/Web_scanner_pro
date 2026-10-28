@@ -4,6 +4,8 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.weappsinc.webscanerpro.ads.DualAppBannerFactory
@@ -73,6 +75,7 @@ class MainActivity : FlutterActivity() {
             "web_scanner_pro/platform",
         )
         platformChannel = channel
+        activePlatformChannel = channel
         channel.setMethodCallHandler { call, result ->
             try {
                 if (call.method == "getCapabilities") {
@@ -146,6 +149,9 @@ class MainActivity : FlutterActivity() {
         if (NotificationCaptureService.onHistoryUpdated === historyUpdateListener) {
             NotificationCaptureService.onHistoryUpdated = null
         }
+        if (activePlatformChannel === platformChannel) {
+            activePlatformChannel = null
+        }
         platformChannel = null
         WebScannerNativeAdFactory.unregisterAll(flutterEngine)
         super.cleanUpFlutterEngine(flutterEngine)
@@ -156,8 +162,31 @@ class MainActivity : FlutterActivity() {
         if (NotificationCaptureService.onHistoryUpdated === historyUpdateListener) {
             NotificationCaptureService.onHistoryUpdated = null
         }
+        if (activePlatformChannel === platformChannel) {
+            activePlatformChannel = null
+        }
         mediaInstance?.dispose()
         mediaInstance = null
         super.onDestroy()
+    }
+
+    companion object {
+        @Volatile
+        private var activePlatformChannel: MethodChannel? = null
+        private val mainHandler = Handler(Looper.getMainLooper())
+
+        fun emitAnalyticsEvent(event: String, parameters: Map<String, Any?>? = null) {
+            mainHandler.post {
+                runCatching {
+                    activePlatformChannel?.invokeMethod(
+                        "onAnalyticsEvent",
+                        mapOf(
+                            "event" to event,
+                            "parameters" to parameters,
+                        ),
+                    )
+                }
+            }
+        }
     }
 }

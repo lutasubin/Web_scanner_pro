@@ -18,6 +18,7 @@ dependencies:
   google_mobile_ads: ^9.2.0
   share_plus: ^13.3.1
   flutter_native_splash: ^2.4.7
+  firebase_analytics: ^12.6.1
 
 dev_dependencies:
   flutter_test:

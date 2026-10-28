@@ -4,6 +4,7 @@ import 'package:get/get.dart';
 import '../../core/ads/ad_service.dart';
 import '../../core/ads/remote_config_service.dart';
 import '../../core/ads/widgets/app_banner_ad.dart';
+import '../../core/analytics/analytics_service.dart';
 import '../../core/di/di.dart';
 import '../../core/models/media_record.dart';
 import '../../core/repositories/preferences_repository.dart';
@@ -26,6 +27,9 @@ class _StatusesPageState extends State<StatusesPage>
   @override
   void initState() {
     super.initState();
+    if (services.isRegistered<AnalyticsService>()) {
+      services<AnalyticsService>().logEvent('StatusPage');
+    }
     WidgetsBinding.instance.addObserver(this);
     _initAndCheckOnboarding();
   }

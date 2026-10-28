@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/ads/remote_config_service.dart';
 import '../../core/ads/widgets/app_banner_ad.dart';
+import '../../core/analytics/analytics_service.dart';
 import '../../core/di/di.dart';
 
 /// Matches original app's `dialog_notify_permission.xml`
@@ -257,6 +258,14 @@ class GuideNotifyPage extends StatefulWidget {
 class _GuideNotifyPageState extends State<GuideNotifyPage> {
   bool _expandUnmute = true;
   bool _expandRemind = true;
+
+  @override
+  void initState() {
+    super.initState();
+    if (services.isRegistered<AnalyticsService>()) {
+      services<AnalyticsService>().logEvent('NotificationGuide');
+    }
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -618,7 +627,7 @@ class _GuideNotifyPageState extends State<GuideNotifyPage> {
 }
 
 /// Matches original app's `GuideStorageActivity` (`activity_guide_storage.xml`)
-class GuideStoragePage extends StatelessWidget {
+class GuideStoragePage extends StatefulWidget {
   const GuideStoragePage({
     super.key,
     required this.onAllowFolder,
@@ -627,6 +636,21 @@ class GuideStoragePage extends StatelessWidget {
 
   final VoidCallback onAllowFolder;
   final bool isDeletedMedia;
+
+  @override
+  State<GuideStoragePage> createState() => _GuideStoragePageState();
+}
+
+class _GuideStoragePageState extends State<GuideStoragePage> {
+  @override
+  void initState() {
+    super.initState();
+    if (services.isRegistered<AnalyticsService>()) {
+      services<AnalyticsService>().logEvent(
+        widget.isDeletedMedia ? 'FileRecoverGuide' : 'StatusGuide',
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -679,7 +703,7 @@ class GuideStoragePage extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      isDeletedMedia
+                      widget.isDeletedMedia
                           ? 'CẦN SỬ DỤNG THƯ MỤC NÀY để phát hiện và khôi phục các tin nhắn phương tiện đã bị xóa.'
                           : 'Cần SỬ DỤNG THƯ MỤC NÀY để phát hiện và lưu các ảnh, video trạng thái từ WhatsApp.',
                       style: const TextStyle(
@@ -705,7 +729,7 @@ class GuideStoragePage extends StatelessWidget {
                         ),
                         onPressed: () {
                           Navigator.of(context).pop();
-                          onAllowFolder();
+                          widget.onAllowFolder();
                         },
                         child: const Text(
                           'Cho phép',
@@ -722,7 +746,7 @@ class GuideStoragePage extends StatelessWidget {
               ),
               const SizedBox(height: 12),
 
-              if (isDeletedMedia)
+              if (widget.isDeletedMedia)
                 // Card 2 (type = 1 in GuideStorageActivity): Bật tự động tải phương tiện
                 Container(
                   padding: const EdgeInsets.all(16),

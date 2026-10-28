@@ -1,5 +1,8 @@
 import 'package:flutter/services.dart';
 
+import '../analytics/analytics_service.dart';
+import '../di/di.dart';
+
 class AppPlatform {
   AppPlatform({MethodChannel? channel})
     : _channel = channel ?? const MethodChannel('web_scanner_pro/platform');
@@ -38,10 +41,31 @@ class AppPlatform {
       case 'onOpenRoute':
         final route = call.arguments as String?;
         if (route != null && route.isNotEmpty) {
+          if (services.isRegistered<AnalyticsService>()) {
+            services<AnalyticsService>().logEvent('notification_open', {
+              'route': route,
+            });
+          }
           for (final listener in List<ValueChanged<String>>.from(
             _openRouteListeners,
           )) {
             listener(route);
+          }
+        }
+        break;
+      case 'onAnalyticsEvent':
+        final raw = call.arguments;
+        if (raw is Map && services.isRegistered<AnalyticsService>()) {
+          final eventName = raw['event']?.toString() ?? '';
+          if (eventName.isNotEmpty) {
+            final rawParams = raw['parameters'];
+            Map<String, Object?>? params;
+            if (rawParams is Map) {
+              params = rawParams.map(
+                (key, value) => MapEntry(key.toString(), value),
+              );
+            }
+            services<AnalyticsService>().logEvent(eventName, params);
           }
         }
         break;

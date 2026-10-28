@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 
 import '../../core/ads/remote_config_service.dart';
 import '../../core/ads/widgets/app_banner_ad.dart';
+import '../../core/analytics/analytics_service.dart';
 import '../../core/di/di.dart';
 import '../../core/widgets/confirm_action.dart';
 import '../../core/widgets/task_feedback.dart';
@@ -26,6 +27,9 @@ class _SessionsPageState extends State<SessionsPage>
   @override
   void initState() {
     super.initState();
+    if (services.isRegistered<AnalyticsService>()) {
+      services<AnalyticsService>().logEvent('account_manager');
+    }
     WidgetsBinding.instance.addObserver(this);
     controller.load();
   }

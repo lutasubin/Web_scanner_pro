@@ -2,6 +2,7 @@ import 'package:get/get.dart';
 
 import '../../core/ads/ad_service.dart';
 import '../../core/ads/remote_config_service.dart';
+import '../../core/analytics/analytics_service.dart';
 import '../../core/di/di.dart';
 import '../../core/platform/app_platform.dart';
 import '../../core/viewmodels/task_controller.dart';
@@ -87,6 +88,9 @@ class SessionsController extends TaskController {
 
   Future<void> create(String name) => perform(() async {
     await _platform.invoke<void>('createSession', {'name': name.trim()});
+    if (services.isRegistered<AnalyticsService>()) {
+      services<AnalyticsService>().logEvent('add_account');
+    }
     await _loadSessions();
   }, success: 'Account added.');
 

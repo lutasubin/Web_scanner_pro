@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../core/analytics/analytics_service.dart';
+import '../../core/di/di.dart';
+
 /// Opens the original app's "How to Use?" BottomSheet (`orig_how_to_use_real.png`).
 Future<void> showHowToUseBottomSheet(BuildContext context) {
   return showModalBottomSheet<void>(
@@ -37,6 +40,14 @@ class _HowToUseSheetContent extends StatefulWidget {
 class _HowToUseSheetContentState extends State<_HowToUseSheetContent> {
   int _loginMode = 0; // 0 = QR Code, 1 = Phone Number
   int _platformTab = 0; // 0 = Android, 1 = iOS
+
+  @override
+  void initState() {
+    super.initState();
+    if (services.isRegistered<AnalyticsService>()) {
+      services<AnalyticsService>().logEvent('HowScanPage');
+    }
+  }
 
   void _pickLoginMode() async {
     final selected = await showMenu<int>(

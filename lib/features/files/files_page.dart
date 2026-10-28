@@ -5,6 +5,7 @@ import '../../core/ads/ad_service.dart';
 import '../../core/ads/remote_config_service.dart';
 import '../../core/ads/widgets/app_banner_ad.dart';
 import '../../core/ads/widgets/app_native_ad.dart';
+import '../../core/analytics/analytics_service.dart';
 import '../../core/di/di.dart';
 import '../../core/models/media_record.dart';
 import '../../core/widgets/confirm_action.dart';
@@ -48,6 +49,11 @@ class _FilesPageState extends State<FilesPage> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    if (services.isRegistered<AnalyticsService>()) {
+      services<AnalyticsService>().logEvent('DownloadsPage', const {
+        'source': 'flutter',
+      });
+    }
     WidgetsBinding.instance.addObserver(this);
     if (c.category.value == 0) {
       c.setCategory(1); // Default to Images tab like original app

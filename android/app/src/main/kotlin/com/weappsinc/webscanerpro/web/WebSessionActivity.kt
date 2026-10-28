@@ -78,6 +78,7 @@ class WebSessionActivity : ComponentActivity() {
     private var isDarkMode = false
     private var openedQrHelperThisSession = false
     private var openedCodeHelperThisSession = false
+    private var loggedQrPageThisSession = false
     private var pendingMediaRequest: PermissionRequest? = null
     private var pendingMediaResources: Array<String> = emptyArray()
     private var pendingFileCallback: ValueCallback<Array<Uri>>? = null
@@ -111,6 +112,9 @@ class WebSessionActivity : ComponentActivity() {
         }?.first
         val selected = extractSelectedUris(result.resultCode, result.data, captured)
         clearPendingFileRequest()
+        if (!selected.isNullOrEmpty()) {
+            MainActivity.emitAnalyticsEvent("photo_picker")
+        }
         callback.onReceiveValue(selected)
         handler.postDelayed({
             webView?.evaluateJavascript(
@@ -247,6 +251,7 @@ class WebSessionActivity : ComponentActivity() {
                 }
             },
             onShowModeDialog = {
+                MainActivity.emitAnalyticsEvent("ModePage")
                 WebHelpDialogs.showDisplayModeDialog(this, webMode) { selectedMode ->
                     setWebDisplayMode(view, selectedMode)
                 }
@@ -254,6 +259,7 @@ class WebSessionActivity : ComponentActivity() {
             onToggleDarkMode = {
                 isDarkMode = !isDarkMode
                 prefs().edit().putBoolean("dark_mode_$sessionId", isDarkMode).apply()
+                MainActivity.emitAnalyticsEvent("dark_mode")
                 applyDarkMode(view)
             },
         )
@@ -564,8 +570,17 @@ class WebSessionActivity : ComponentActivity() {
     private fun onLoggedInDetected(view: WebView) {
         if (!isLoggedIn) {
             isLoggedIn = true
+            loggedQrPageThisSession = false
             toolbar.setLoggedIn(true)
             updateLoginModeViews()
+            MainActivity.emitAnalyticsEvent("WebUserPage")
+            MainActivity.emitAnalyticsEvent(
+                "login_success",
+                mapOf(
+                    "id" to sessionId,
+                    "userName" to session.name,
+                ),
+            )
             val prefs = prefs()
             if (!prefs.getBoolean("shown_first_login_security_dialog", false)) {
                 prefs.edit().putBoolean("shown_first_login_security_dialog", true).apply()
@@ -576,6 +591,13 @@ class WebSessionActivity : ComponentActivity() {
         applyDarkMode(view)
         progress.visibility = View.GONE
         message.visibility = View.GONE
+    }
+
+    private fun logWebQrPageIfNeeded() {
+        if (!loggedQrPageThisSession) {
+            loggedQrPageThisSession = true
+            MainActivity.emitAnalyticsEvent("WebQRPage")
+        }
     }
 
     private inner class AndroidJsBridge {
@@ -592,6 +614,7 @@ class WebSessionActivity : ComponentActivity() {
                             isLoggedIn = false
                             toolbar.setLoggedIn(false)
                         }
+                        logWebQrPageIfNeeded()
                         progress.visibility = View.GONE
                         message.visibility = View.GONE
                         updateLoginModeViews()
@@ -603,6 +626,7 @@ class WebSessionActivity : ComponentActivity() {
                             isLoggedIn = false
                             toolbar.setLoggedIn(false)
                         }
+                        logWebQrPageIfNeeded()
                         progress.visibility = View.GONE
                         message.visibility = View.GONE
                         updateLoginModeViews()
@@ -915,6 +939,7 @@ class WebSessionActivity : ComponentActivity() {
                 } else {
                     try {
                         val created = WebSessionStore(this).create(name)
+                        MainActivity.emitAnalyticsEvent("add_account")
                         dialog.dismiss()
                         switchSession(created.id)
                     } catch (_: Exception) {
@@ -928,6 +953,7 @@ class WebSessionActivity : ComponentActivity() {
     }
 
     private fun showHelp(mode: String = currentLoginMode) {
+        MainActivity.emitAnalyticsEvent("HowScanPage")
         val view = webView
         WebHelpDialogs.showHelpSheet(
             activity = this,
@@ -941,6 +967,7 @@ class WebSessionActivity : ComponentActivity() {
     }
 
     private fun openDownloads() {
+        MainActivity.emitAnalyticsEvent("DownloadsPage", mapOf("source" to "native"))
         try {
             val intent = Intent(this, MainActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
@@ -986,6 +1013,7 @@ class WebSessionActivity : ComponentActivity() {
                 }
                 "\"login\"" -> {
                     isLoginReady = true
+                    logWebQrPageIfNeeded()
                     progress.visibility = View.GONE
                     message.visibility = View.GONE
                     updateLoginModeViews()
