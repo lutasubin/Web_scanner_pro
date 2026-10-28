@@ -46,7 +46,12 @@ internal class OwnedDownloads(context: Context) {
 
     fun delete(id: String) {
         val record = requireOwned(id)
-        if (resolver.delete(record.uri, null, null) < 1) throw IOException("Cannot delete download")
+        if (record.uri.scheme == "file") {
+            val file = record.uri.path?.let { java.io.File(it) }
+            if (file == null || !file.delete()) throw IOException("Cannot delete download")
+        } else {
+            if (resolver.delete(record.uri, null, null) < 1) throw IOException("Cannot delete download")
+        }
         registry.remove(record.uri)
     }
 }

@@ -3,7 +3,10 @@ package com.weappsinc.webscanerpro.media
 import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
+import android.os.Build
 import android.provider.MediaStore
+import java.io.File
+import java.io.FileOutputStream
 import java.io.IOException
 import java.io.OutputStream
 
@@ -28,19 +31,27 @@ internal class DownloadWriter(
 
     fun open(name: String, mimeType: String): PendingDownload {
         val safeName = safeName(name)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            val destFile = File(query.legacyDir, safeName)
+            val destUri = Uri.fromFile(destFile)
+            registry.add(destUri)
+            val output = FileOutputStream(destFile)
+            return PendingDownload(destUri, output, resolver, registry, destFile)
+        }
         val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, safeName)
             put(MediaStore.MediaColumns.MIME_TYPE, mimeType.ifBlank { "application/octet-stream" })
             put(MediaStore.MediaColumns.RELATIVE_PATH, query.directory)
             put(MediaStore.MediaColumns.IS_PENDING, 1)
         }
-        val destination = resolver.insert(query.collection, values) ?: throw IOException("Cannot create download")
+        val col = query.collection ?: throw IOException("Cannot access downloads collection")
+        val destination = resolver.insert(col, values) ?: throw IOException("Cannot create download")
         try {
             // Lưu URI trước khi copy để dọn bản ghi pending nếu tiến trình bị dừng.
             registry.add(destination)
             val output = resolver.openOutputStream(destination, "w")
                 ?: throw IOException("Cannot write download")
-            return PendingDownload(destination, output, resolver, registry)
+            return PendingDownload(destination, output, resolver, registry, null)
         } catch (error: Exception) {
             runCatching { resolver.delete(destination, null, null) }
             runCatching { registry.remove(destination) }
@@ -62,6 +73,7 @@ internal class PendingDownload(
     val output: OutputStream,
     private val resolver: android.content.ContentResolver,
     private val registry: OwnedFileRegistry,
+    private val legacyFile: File? = null,
 ) {
     private var closed = false
 
@@ -77,9 +89,11 @@ internal class PendingDownload(
         try {
             output.flush()
             output.close()
-            val ready = ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }
-            if (resolver.update(uri, ready, null, null) != 1) {
-                throw IOException("Cannot publish download")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && legacyFile == null) {
+                val ready = ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }
+                if (resolver.update(uri, ready, null, null) != 1) {
+                    throw IOException("Cannot publish download")
+                }
             }
             closed = true
         } catch (error: Exception) {
@@ -96,7 +110,11 @@ internal class PendingDownload(
     private fun abortInternal() {
         closed = true
         runCatching { output.close() }
-        runCatching { resolver.delete(uri, null, null) }
+        if (legacyFile != null) {
+            runCatching { legacyFile?.delete() }
+        } else {
+            runCatching { resolver.delete(uri, null, null) }
+        }
         runCatching { registry.remove(uri) }
     }
 }

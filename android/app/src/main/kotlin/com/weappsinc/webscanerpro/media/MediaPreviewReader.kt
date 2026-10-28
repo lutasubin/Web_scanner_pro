@@ -47,9 +47,11 @@ internal class MediaPreviewReader(private val context: Context) {
     }
 
     private fun loadBitmap(uri: Uri, mimeType: String, maxEdge: Int): Bitmap? {
-        runCatching {
-            resolver.loadThumbnail(uri, Size(maxEdge, maxEdge), null)
-        }.getOrNull()?.let { return it }
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            runCatching {
+                resolver.loadThumbnail(uri, Size(maxEdge, maxEdge), null)
+            }.getOrNull()?.let { return it }
+        }
 
         return if (mimeType.startsWith("video/")) {
             decodeVideoFrame(uri, maxEdge)
