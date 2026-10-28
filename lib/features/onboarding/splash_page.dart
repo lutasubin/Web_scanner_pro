@@ -132,7 +132,7 @@ class _SplashPageState extends State<SplashPage>
                   ),
                   clipBehavior: Clip.antiAlias,
                   child: Image.asset(
-                    'assets/images/splash_icon.png',
+                    'assets/logo_app/logo.png',
                     fit: BoxFit.cover,
                   ),
                 ),

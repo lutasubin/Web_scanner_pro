@@ -357,7 +357,7 @@ class _GuideNotifyPageState extends State<GuideNotifyPage> {
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(6),
                                   child: Image.asset(
-                                    'assets/images/splash_icon.png',
+                                    'assets/logo_app/logo.png',
                                     width: 28,
                                     height: 28,
                                   ),

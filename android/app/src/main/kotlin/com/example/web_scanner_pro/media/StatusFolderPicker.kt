@@ -21,10 +21,16 @@ internal class StatusFolderPicker(private val activity: Activity, private val fo
         val defaultTreeUri = Uri.parse(
             "content://com.android.externalstorage.documents/document/primary%3AAndroid%2Fmedia",
         )
+        val existing = folders.selected(business)
+        val initialUri = if (existing != null && !existing.toString().endsWith("%2F.Statuses")) {
+            existing
+        } else {
+            defaultTreeUri
+        }
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
             putExtra(Intent.EXTRA_LOCAL_ONLY, true)
-            putExtra(DocumentsContract.EXTRA_INITIAL_URI, folders.selected(business) ?: defaultTreeUri)
+            putExtra(DocumentsContract.EXTRA_INITIAL_URI, initialUri)
         }
         try {
             activity.startActivityForResult(intent, requestCode)

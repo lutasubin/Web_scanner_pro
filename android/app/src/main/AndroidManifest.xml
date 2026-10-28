@@ -16,7 +16,7 @@
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:usesCleartextTraffic="false"
         android:name="${applicationName}"
-        android:icon="@drawable/ic_web_scanner">
+        android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"
             android:exported="true"

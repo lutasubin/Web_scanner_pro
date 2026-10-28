@@ -114,11 +114,14 @@ internal class StatusFolders(private val context: Context) {
     }
 
     fun hasFolderPermission(business: Boolean = false): Boolean {
-        if (listDirectPublicStatuses(business).isNotEmpty() || listDirectPublicWaMedia().isNotEmpty()) {
+        if (listDirectPublicWaMedia().isNotEmpty()) {
             return true
         }
         val uri = selected(business) ?: return false
-        return resolver.persistedUriPermissions.any { it.uri == uri && it.isReadPermission }
+        val hasPerm = resolver.persistedUriPermissions.any { it.uri == uri && it.isReadPermission }
+        if (!hasPerm) return false
+        val treeDocId = runCatching { DocumentsContract.getTreeDocumentId(uri) }.getOrNull().orEmpty()
+        return treeDocId.isNotEmpty() && !treeDocId.endsWith("/.Statuses")
     }
 
     fun listWaMedia(): List<MediaRecord> {
@@ -167,7 +170,7 @@ internal class StatusFolders(private val context: Context) {
         }
 
         // 4. Include all backed-up files (including ones already deleted from WhatsApp!)
-        backupDir.listFiles()?.mapNotNull(MediaRecord::fromFile)?.forEach { backupRecord ->
+        backupDir.listFiles()?.mapNotNull(MediaRecord::fromAnyFile)?.forEach { backupRecord ->
             combined.putIfAbsent(backupRecord.name, backupRecord)
         }
 
@@ -250,8 +253,9 @@ internal class StatusFolders(private val context: Context) {
                         continue
                     }
                     if (size <= 0L) continue
+                    val normalizedMime = if (name.endsWith(".opus", ignoreCase = true)) "audio/ogg" else mime
                     val docUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
-                    out.add(MediaRecord(docUri, name, mime, size, modified))
+                    out.add(MediaRecord(docUri, name, normalizedMime, size, modified))
                 }
             }
         } catch (_: Exception) {
@@ -292,9 +296,9 @@ internal class StatusFolders(private val context: Context) {
                         child.name.equals("Private", ignoreCase = true)
                     ) continue
                     if (child.isDirectory && sub.endsWith("Voice Notes")) {
-                        child.listFiles()?.mapNotNull(MediaRecord::fromFile)?.let(out::addAll)
+                        child.listFiles()?.mapNotNull(MediaRecord::fromAnyFile)?.let(out::addAll)
                     } else if (child.isFile) {
-                        MediaRecord.fromFile(child)?.let(out::add)
+                        MediaRecord.fromAnyFile(child)?.let(out::add)
                     }
                 }
             }
@@ -309,7 +313,7 @@ internal class StatusFolders(private val context: Context) {
 
     fun findInSelected(id: String): MediaRecord? {
         listWebStatuses().firstOrNull { it.uri.toString() == id }?.let { return it }
-        waMediaBackupDir(context).listFiles()?.mapNotNull(MediaRecord::fromFile)
+        waMediaBackupDir(context).listFiles()?.mapNotNull(MediaRecord::fromAnyFile)
             ?.firstOrNull { it.uri.toString() == id }?.let { return it }
         listDirectPublicWaMedia().firstOrNull { it.uri.toString() == id }?.let { return it }
         for (business in listOf(false, true)) {
