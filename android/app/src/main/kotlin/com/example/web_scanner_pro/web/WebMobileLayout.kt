@@ -121,7 +121,7 @@ object WebMobileLayout {
           document.documentElement.style.setProperty('--width-album-grid-bubble','125px');
           document.body.style.overflowX='hidden';
 
-          var VERSION=18;
+          var VERSION=20;
           if(window.__webScannerMobileLayout&&window.__webScannerMobileLayout.version===VERSION){
             window.__webScannerMobileLayout.refresh();
             return 'updated';
@@ -281,20 +281,159 @@ object WebMobileLayout {
             }).catch(function(){});
           };
 
+          api.isStatusContextActive=function(){
+            if(document.querySelector("[data-testid='status-player-uie'],[data-testid='status-v3-player'],[data-testid='status-tab-drawer'],[data-testid='status-list-drawer']"))return true;
+            var dl=document.querySelector("[data-testid='drawer-left']");
+            if(dl){
+              var txt=(dl.innerText||dl.textContent||'').toLowerCase();
+              if(txt.indexOf('trạng thái')!==-1||txt.indexOf('status')!==-1)return true;
+            }
+            var dm=document.querySelector("[data-testid='drawer-middle']");
+            if(dm){
+              var mtxt=(dm.innerText||dm.textContent||'').toLowerCase();
+              if(mtxt.indexOf('trạng thái của tôi')!==-1||mtxt.indexOf('my status')!==-1)return true;
+            }
+            return false;
+          };
+
+          if(!window.__webScannerOrigCreateObjectURL&&window.URL&&window.URL.createObjectURL){
+            window.__webScannerOrigCreateObjectURL=window.URL.createObjectURL.bind(window.URL);
+            window.URL.createObjectURL=function(obj){
+              var url=window.__webScannerOrigCreateObjectURL(obj);
+              try{
+                if(obj&&typeof obj.size==='number'&&typeof obj.type==='string'){
+                  var isVid=obj.type.indexOf('video/')===0&&obj.size>10240;
+                  var isImg=obj.type.indexOf('image/')===0&&obj.size>18432;
+                  var activeApi=window.__webScannerMobileLayout||api;
+                  if((isVid||isImg)&&activeApi&&activeApi.isStatusContextActive&&activeApi.isStatusContextActive()){
+                    if(!window.__webScannerCapturedStatuses)window.__webScannerCapturedStatuses={};
+                    if(!window.__webScannerCapturedStatuses[url]){
+                      window.__webScannerCapturedStatuses[url]=true;
+                      setTimeout(function(){activeApi.transferStatusMedia(url,true);},60);
+                    }
+                  }
+                }
+              }catch(e){}
+              return url;
+            };
+          }
+
+          api.captureEditorStatusMedia=function(){
+            var editor=document.querySelector("[data-testid='media-editor-canvas']")||
+              document.querySelector("[data-testid='drawer-middle']")||
+              document.querySelector("[data-testid='drawer-fullscreen']");
+            if(!editor)return;
+            var video=editor.querySelector('video');
+            if(video){
+              var vSrc=video.currentSrc||video.src||(video.querySelector('source')&&video.querySelector('source').src)||'';
+              if(vSrc.startsWith('blob:')||vSrc.startsWith('https:')){
+                api.transferStatusMedia(vSrc,true);
+                return;
+              }
+            }
+            var imgs=Array.from(editor.querySelectorAll('img')).filter(function(node){
+              var src=node.currentSrc||node.src||'';
+              if(!(src.startsWith('blob:')||src.startsWith('data:')||src.startsWith('https://')))return false;
+              var r=node.getBoundingClientRect();
+              return (node.naturalWidth>120||r.width>120);
+            });
+            if(imgs.length>0){
+              imgs.sort(function(a,b){
+                var ra=a.getBoundingClientRect(),rb=b.getBoundingClientRect();
+                return (rb.width*rb.height)-(ra.width*ra.height);
+              });
+              var bestSrc=imgs[0].currentSrc||imgs[0].src||'';
+              if(bestSrc.startsWith('data:')){
+                var bridge=window.WebScannerDownloads;
+                if(bridge&&bridge.saveDataUrl)bridge.saveDataUrl(bestSrc,'editor_img',true);
+                return;
+              }
+              if(bestSrc){
+                api.transferStatusMedia(bestSrc,true);
+                return;
+              }
+            }
+            var canvas=editor.querySelector('canvas');
+            if(canvas&&canvas.width>120&&canvas.height>120){
+              try{
+                var dataUrl=canvas.toDataURL('image/jpeg',0.92);
+                var bridge2=window.WebScannerDownloads;
+                if(dataUrl&&dataUrl.startsWith('data:')&&bridge2&&bridge2.saveDataUrl){
+                  bridge2.saveDataUrl(dataUrl,'editor_canvas',true);
+                }
+              }catch(e){}
+            }
+          };
+
+          api.findStatusPlayer=function(){
+            var explicit=document.querySelector("[data-testid='status-player-uie'],[data-testid='status-v3-player']");
+            if(explicit)return explicit;
+            if(document.querySelector("[data-testid='media-editor-canvas']"))return null;
+            var videos=Array.from(document.querySelectorAll('video')).filter(function(v){
+              if(v.closest("#main,#pane-side,[data-testid='drawer-left']"))return false;
+              var r=v.getBoundingClientRect();
+              return r.width>150&&r.height>150;
+            });
+            if(videos.length>0){
+              return videos[0].closest("[role='dialog'],[data-testid='drawer-fullscreen'],[data-testid='drawer-middle']")||videos[0].parentElement;
+            }
+            return null;
+          };
+
           api.syncStatusPlayer=function(){
-            var player=document.querySelector("[data-testid='status-player-uie']");
+            var player=api.findStatusPlayer();
             var existingBtn=document.getElementById('web-scanner-status-save-btn');
             if(!player){
               if(existingBtn)existingBtn.remove();
+              if(window.__webScannerStatusPollTimer){
+                clearInterval(window.__webScannerStatusPollTimer);
+                window.__webScannerStatusPollTimer=null;
+              }
               return;
             }
-            var img=player.querySelector("[data-testid='status-image'] img")||
-              Array.from(player.querySelectorAll('img')).find(function(node){
-                var src=node.src||'';
-                return src.startsWith('blob:')||src.startsWith('https://');
-              });
+            if(!window.__webScannerStatusPollTimer){
+              window.__webScannerStatusPollTimer=setInterval(function(){
+                api.syncStatusPlayer();
+              },350);
+            }
             var video=player.querySelector('video');
-            var mediaSrc=(video&&video.src)||(img&&img.src)||'';
+            var videoSrc='';
+            if(video){
+              videoSrc=video.currentSrc||video.src||(video.querySelector('source')&&video.querySelector('source').src)||'';
+              if(!video.getAttribute('data-ws-bound')){
+                video.setAttribute('data-ws-bound','1');
+                video.addEventListener('loadeddata',function(){api.syncStatusPlayer();});
+                video.addEventListener('play',function(){api.syncStatusPlayer();});
+              }
+            }
+            var imgSrc='';
+            if(!video){
+              var candidates=Array.from(player.querySelectorAll('img')).filter(function(node){
+                var src=node.currentSrc||node.src||'';
+                if(!(src.startsWith('blob:')||src.startsWith('https://')))return false;
+                if(node.closest("header,[role='button'],[data-testid='status-thumbnail'],[data-testid*='avatar']"))return false;
+                var cs=window.getComputedStyle(node);
+                if((cs&&cs.filter&&cs.filter.indexOf('blur')!==-1)||(node.style&&node.style.filter&&node.style.filter.indexOf('blur')!==-1))return false;
+                var rect=node.getBoundingClientRect();
+                var nw=node.naturalWidth||0;
+                var nh=node.naturalHeight||0;
+                if(nw>0&&nh>0&&nw<=120&&nh<=120)return false;
+                if(rect.width>0&&rect.height>0&&rect.width<=96&&rect.height<=96)return false;
+                if(!node.getAttribute('data-ws-bound')){
+                  node.setAttribute('data-ws-bound','1');
+                  node.addEventListener('load',function(){api.syncStatusPlayer();});
+                }
+                return (nw>120||rect.width>120);
+              });
+              candidates.sort(function(a,b){
+                var ra=a.getBoundingClientRect(),rb=b.getBoundingClientRect();
+                return (rb.width*rb.height)-(ra.width*ra.height);
+              });
+              if(candidates.length>0){
+                imgSrc=candidates[0].currentSrc||candidates[0].src||'';
+              }
+            }
+            var mediaSrc=videoSrc||imgSrc||'';
             if(mediaSrc.startsWith('blob:')||mediaSrc.startsWith('https:')){
               if(!window.__webScannerCapturedStatuses)window.__webScannerCapturedStatuses={};
               if(!window.__webScannerCapturedStatuses[mediaSrc]){
@@ -314,7 +453,7 @@ object WebMobileLayout {
                 document.body.appendChild(existingBtn);
               }
               existingBtn.setAttribute('data-status-src',mediaSrc);
-            }else if(existingBtn){
+            }else if(!video&&existingBtn){
               existingBtn.remove();
             }
           };
@@ -462,6 +601,15 @@ object WebMobileLayout {
               setTimeout(function(){api.showDetail();},120);
               setTimeout(function(){api.showDetail();},450);
               return;
+            }
+            var sendBtn=target.closest(
+              "[data-testid='wds-ic-send-filled'],button:has([data-testid='wds-ic-send-filled'])," +
+              "div[role='button']:has([data-testid='wds-ic-send-filled'])," +
+              "span:has(>div>div>[data-testid='wds-ic-send-filled'])," +
+              "[data-testid='send'],button[aria-label='Gửi'],button[aria-label='Send']"
+            );
+            if(sendBtn&&!target.closest('#main')){
+              api.captureEditorStatusMedia();
             }
             var drawerTarget=target.closest("[data-testid='drawer-left'],[data-testid='drawer-middle'],[data-testid='status-player-uie']");
             if(drawerTarget){

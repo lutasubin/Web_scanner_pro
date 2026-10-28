@@ -7,6 +7,7 @@ import '../../core/platform/app_platform.dart';
 import '../../core/repositories/preferences_repository.dart';
 import '../../core/viewmodels/task_controller.dart';
 import '../sessions/web_session.dart';
+import '../statuses/statuses_controller.dart';
 
 class HomeController extends TaskController {
   HomeController(this._platform);
@@ -14,6 +15,32 @@ class HomeController extends TaskController {
   final AppPlatform _platform;
   final sessions = <WebSession>[].obs;
   final showHandCoachmark = false.obs;
+
+  @override
+  void onInit() {
+    super.onInit();
+    _platform.addOpenRouteListener(_handleOpenRoute);
+  }
+
+  @override
+  void onClose() {
+    _platform.removeOpenRouteListener(_handleOpenRoute);
+    super.onClose();
+  }
+
+  Future<void> _handleOpenRoute(String route) async {
+    if (route.isEmpty || Get.testMode) return;
+    try {
+      await _platform.invoke<String>('consumePendingRoute');
+    } catch (_) {}
+    if (Get.currentRoute == route) {
+      if (Get.isRegistered<StatusesController>()) {
+        await Get.find<StatusesController>().load();
+      }
+      return;
+    }
+    await Get.toNamed<void>(route);
+  }
 
   WebSession? get activeSession {
     for (final session in sessions) {

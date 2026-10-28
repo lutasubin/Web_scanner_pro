@@ -48,6 +48,7 @@ internal class StatusFolderPicker(private val activity: Activity, private val fo
         }
         MediaTasks.run(result, {
             folders.persist(uri, business, data.flags)
+            StatusMonitorService.ensureRunning(activity, refreshWatchers = true)
             true
         })
         return true

@@ -19,6 +19,32 @@ class StatusesController extends TaskController {
   final savedItems = <MediaRecord>[].obs;
   final selectedIds = <String>{}.obs;
   final selectionMode = false.obs;
+  bool _pendingRealtimeReload = false;
+
+  @override
+  void onInit() {
+    super.onInit();
+    _platform.addStatusesChangedListener(_onRealtimeStatusesChanged);
+  }
+
+  @override
+  void onClose() {
+    _platform.removeStatusesChangedListener(_onRealtimeStatusesChanged);
+    super.onClose();
+  }
+
+  Future<void> _onRealtimeStatusesChanged() async {
+    if (busy.value) {
+      _pendingRealtimeReload = true;
+      return;
+    }
+    try {
+      final statusValues = await _platform.readList('listStatuses', {
+        'business': business.value,
+      });
+      items.assignAll(statusValues.map(MediaRecord.fromMap));
+    } catch (_) {}
+  }
 
   List<MediaRecord> get currentTabItems {
     final source = activeTab.value == 0 ? items : savedItems;
@@ -49,6 +75,13 @@ class StatusesController extends TaskController {
           !items.any((e) => e.id == id) && !savedItems.any((e) => e.id == id),
     );
     if (selectedIds.isEmpty) selectionMode.value = false;
+    if (_pendingRealtimeReload) {
+      _pendingRealtimeReload = false;
+      final latestValues = await _platform.readList('listStatuses', {
+        'business': business.value,
+      });
+      items.assignAll(latestValues.map(MediaRecord.fromMap));
+    }
   });
 
   Future<void> selectFolder() async {

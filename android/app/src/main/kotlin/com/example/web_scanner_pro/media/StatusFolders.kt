@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Environment
+import android.provider.DocumentsContract
 import androidx.documentfile.provider.DocumentFile
 import java.io.File
 import java.io.IOException
@@ -43,16 +44,73 @@ internal class StatusFolders(private val context: Context) {
         if (uri != null) {
             val hasPerm = resolver.persistedUriPermissions.any { it.uri == uri && it.isReadPermission }
             if (hasPerm) {
-                runCatching {
-                    statusDirectory(uri).listFiles().mapNotNull(MediaRecord::fromDocument)
-                }.getOrDefault(emptyList()).forEach { record ->
-                    combined[record.uri.toString()] = record
+                val fastRecords = queryStatusesFast(uri, business)
+                if (fastRecords != null) {
+                    fastRecords.forEach { record ->
+                        combined[record.uri.toString()] = record
+                    }
+                } else {
+                    runCatching {
+                        statusDirectory(uri).listFiles().mapNotNull(MediaRecord::fromDocument)
+                    }.getOrDefault(emptyList()).forEach { record ->
+                        combined[record.uri.toString()] = record
+                    }
                 }
             } else if (combined.isEmpty()) {
                 throw MediaFailure("folder_access_lost", "Quyền đọc thư mục đã bị thu hồi. Hãy chọn lại thư mục status.")
             }
         }
         return combined.values.sortedByDescending { it.modifiedAt }
+    }
+
+    private fun queryStatusesFast(treeUri: Uri, business: Boolean): List<MediaRecord>? {
+        val treeDocId = runCatching { DocumentsContract.getTreeDocumentId(treeUri) }.getOrNull() ?: return null
+        val targetDocId = when {
+            treeDocId.endsWith(".Statuses") -> treeDocId
+            treeDocId == "primary:Android/media" -> if (business) {
+                "primary:Android/media/com.whatsapp.w4b/WhatsApp Business/Media/.Statuses"
+            } else {
+                "primary:Android/media/com.whatsapp/WhatsApp/Media/.Statuses"
+            }
+            else -> return null
+        }
+        val childrenUri = runCatching {
+            DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, targetDocId)
+        }.getOrNull() ?: return null
+
+        val projection = arrayOf(
+            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            DocumentsContract.Document.COLUMN_MIME_TYPE,
+            DocumentsContract.Document.COLUMN_SIZE,
+            DocumentsContract.Document.COLUMN_LAST_MODIFIED,
+        )
+        val records = ArrayList<MediaRecord>()
+        return try {
+            val cursor = resolver.query(childrenUri, projection, null, null, null) ?: return null
+            cursor.use { c ->
+                val idCol = c.getColumnIndex(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                val nameCol = c.getColumnIndex(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                val mimeCol = c.getColumnIndex(DocumentsContract.Document.COLUMN_MIME_TYPE)
+                val sizeCol = c.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE)
+                val modCol = c.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
+                while (c.moveToNext()) {
+                    val docId = if (idCol >= 0) c.getString(idCol) else null
+                    val name = if (nameCol >= 0) c.getString(nameCol) else null
+                    val mime = if (mimeCol >= 0) c.getString(mimeCol) else null
+                    val size = if (sizeCol >= 0) c.getLong(sizeCol) else 0L
+                    val modified = if (modCol >= 0) c.getLong(modCol) else 0L
+                    if (docId.isNullOrBlank() || name.isNullOrBlank() || mime.isNullOrBlank()) continue
+                    if (name.startsWith(".") || name.endsWith(".was", ignoreCase = true) || size <= 0L) continue
+                    if (!(mime.startsWith("image/") || mime.startsWith("video/"))) continue
+                    val docUri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId)
+                    records.add(MediaRecord(docUri, name, mime, size, modified))
+                }
+            }
+            records
+        } catch (_: Exception) {
+            null
+        }
     }
 
     fun find(id: String, business: Boolean): MediaRecord = list(business).firstOrNull {
@@ -74,7 +132,14 @@ internal class StatusFolders(private val context: Context) {
     }
 
     private fun listWebStatuses(): List<MediaRecord> =
-        webStatusDir(context).listFiles()?.mapNotNull(MediaRecord::fromFile).orEmpty()
+        webStatusDir(context).listFiles()?.mapNotNull { file ->
+            if (file.isFile && !file.name.endsWith(".mp4", ignoreCase = true) && file.length() in 1L..10_239L) {
+                runCatching { file.delete() }
+                null
+            } else {
+                MediaRecord.fromFile(file)
+            }
+        }.orEmpty()
 
     private fun listDirectPublicStatuses(business: Boolean): List<MediaRecord> {
         val ext = runCatching { Environment.getExternalStorageDirectory() }.getOrNull() ?: return emptyList()

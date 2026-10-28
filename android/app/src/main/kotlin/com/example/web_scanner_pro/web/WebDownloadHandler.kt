@@ -10,6 +10,7 @@ import android.webkit.WebView
 import com.example.web_scanner_pro.media.OwnedDownloads
 import com.example.web_scanner_pro.media.PendingDownload
 import com.example.web_scanner_pro.media.StatusFolders
+import com.example.web_scanner_pro.media.StatusMonitorService
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
@@ -173,6 +174,9 @@ internal class WebDownloadHandler(
             try {
                 val bytes = Base64.decode(payload, Base64.DEFAULT)
                 if (bytes.isEmpty()) return@execute
+                if (cacheOnly && mimeType.startsWith("image/") && bytes.size < 10_240 && !keyHint.startsWith("editor_")) {
+                    return@execute
+                }
                 val ext = when {
                     mimeType.contains("mp4") || mimeType.startsWith("video/") -> "mp4"
                     mimeType.contains("png") -> "png"
@@ -185,9 +189,11 @@ internal class WebDownloadHandler(
                     .joinToString("") { "%02x".format(it) }
                 val fileName = "status_$digest.$ext"
                 val cacheFile = File(StatusFolders.webStatusDir(appContext), fileName)
-                if (!cacheFile.exists() || cacheFile.length() != bytes.size.toLong()) {
+                val isNewFile = !cacheFile.exists() || cacheFile.length() != bytes.size.toLong()
+                if (isNewFile) {
                     cacheFile.writeBytes(bytes)
                 }
+                StatusMonitorService.onStatusDetected(appContext, fileName, notifyUser = isNewFile)
                 if (!cacheOnly) {
                     val target = downloads.open(fileName, mimeType)
                     try {

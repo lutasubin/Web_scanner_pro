@@ -6,4 +6,5 @@
     <string name="loading_whatsapp">Đang tải WhatsApp Web</string>
     <string name="web_ready_hint">WhatsApp Web · Dùng WhatsApp chính → Thiết bị liên kết để quét QR</string>
     <string name="web_slow_hint">Trang phản hồi chậm. Nếu chưa thấy QR, hãy chọn Tải lại.</string>
+    <string name="observer_notification_status">🎉 New Status is here. Tap to check it out.</string>
 </resources>
