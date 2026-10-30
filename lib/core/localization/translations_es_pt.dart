@@ -24,6 +24,9 @@ const esTranslations = <String, String>{
   'history': 'Notificaciones guardadas',
   'files': 'Archivos guardados',
   'generic_error': 'No se pudo completar. Inténtalo de nuevo.',
+  'onboarding_title_1': 'Supervisa varias cuentas en\nun solo dispositivo',
+  'onboarding_title_2': 'Sincronización automática\ny rápida',
+  'onboarding_title_3': 'Administra los archivos\ndescargados',
 };
 
 const ptTranslations = <String, String>{
@@ -52,4 +55,7 @@ const ptTranslations = <String, String>{
   'history': 'Notificações salvas',
   'files': 'Arquivos salvos',
   'generic_error': 'Não foi possível concluir. Tente novamente.',
+  'onboarding_title_1': 'Acompanhe várias contas em\num único dispositivo',
+  'onboarding_title_2': 'Sincronização automática\ne rápida',
+  'onboarding_title_3': 'Gerencie arquivos\nbaixados',
 };

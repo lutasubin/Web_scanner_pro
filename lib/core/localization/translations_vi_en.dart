@@ -24,6 +24,9 @@ const viTranslations = <String, String>{
   'history': 'Thông báo đã lưu',
   'files': 'Tệp đã lưu',
   'generic_error': 'Không thể hoàn tất thao tác. Vui lòng thử lại.',
+  'onboarding_title_1': 'Theo dõi nhiều tài khoản trên\nmột thiết bị',
+  'onboarding_title_2': 'Tự động đồng bộ nhanh\nchóng',
+  'onboarding_title_3': 'Quản lý tệp đã tải\nxuống',
 };
 
 const enTranslations = <String, String>{
@@ -52,4 +55,7 @@ const enTranslations = <String, String>{
   'history': 'Saved notifications',
   'files': 'Saved files',
   'generic_error': 'Unable to complete the action. Please try again.',
+  'onboarding_title_1': 'Track multiple accounts on\none device',
+  'onboarding_title_2': 'Fast automatic\nsynchronization',
+  'onboarding_title_3': 'Manage downloaded\nfiles',
 };

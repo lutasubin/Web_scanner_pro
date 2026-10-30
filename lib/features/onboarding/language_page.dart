@@ -124,7 +124,7 @@ class _LanguagePageState extends State<LanguagePage> {
     if (!mounted) return;
     _applyLocale(_selectedCode);
     if (_fromSplash) {
-      await Get.offAllNamed<void>(AppRoutes.home);
+      await Get.offAllNamed<void>(AppRoutes.onboarding);
     } else {
       Get.back<void>();
     }

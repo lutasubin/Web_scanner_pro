@@ -7,36 +7,39 @@
         android:gravity="center"
         android:orientation="vertical"
         android:id="@+id/native_ad_small_layout"
-        android:background="@color/ad_back"
-        android:paddingTop="2dp"
-        android:paddingBottom="17dp"
+        android:background="#FFFAF6F5"
+        android:paddingTop="14dp"
+        android:paddingBottom="18dp"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:minHeight="80dp"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp">
+        android:minHeight="156dp"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp">
         <LinearLayout
+            android:gravity="center_vertical"
             android:orientation="horizontal"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="5dp"
-            android:layout_marginBottom="24dp"
-            android:layout_marginStart="5dp"
-            android:layout_marginEnd="5dp">
+            android:layout_marginBottom="16dp">
             <ImageView
                 android:id="@+id/ad_app_icon"
-                android:layout_width="45dp"
-                android:layout_height="45dp"
-                android:layout_margin="5dp"
+                android:background="@drawable/ad_onboarding_icon_bg"
+                android:layout_width="52dp"
+                android:layout_height="52dp"
+                android:layout_marginEnd="14dp"
+                android:scaleType="centerCrop"
                 android:adjustViewBounds="true"/>
             <LinearLayout
                 android:orientation="vertical"
+                android:gravity="center_vertical"
                 android:layout_width="0dp"
-                android:layout_height="55dp"
+                android:layout_height="wrap_content"
                 android:layout_weight="1">
                 <TextView
-                    android:textSize="12sp"
-                    android:textColor="@color/ad_text"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:textColor="#FF111111"
+                    android:text="Tên App"
                     android:ellipsize="end"
                     android:id="@+id/ad_headline"
                     android:layout_width="match_parent"
@@ -44,34 +47,35 @@
                     android:layout_marginBottom="4dp"
                     android:maxLines="1"/>
                 <LinearLayout
+                    android:gravity="center_vertical"
                     android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_weight="1">
+                    android:layout_height="wrap_content">
                     <TextView style="@style/AdAttribution"/>
                     <TextView
-                        android:textSize="12sp"
-                        android:textColor="@color/ad_text"
+                        android:textSize="13sp"
+                        android:textColor="#FF7A7A7A"
+                        android:text="Mô tả"
                         android:ellipsize="end"
                         android:id="@+id/ad_body"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginLeft="4dp"
-                        android:layout_marginRight="20dp"
-                        android:maxLines="2"
-                        android:layout_marginStart="4dp"
-                        android:layout_marginEnd="20dp"/>
+                        android:maxLines="1"
+                        android:layout_marginStart="5dp"
+                        android:layout_marginEnd="16dp"/>
                 </LinearLayout>
             </LinearLayout>
         </LinearLayout>
         <Button
             android:textSize="16sp"
+            android:textStyle="bold"
             android:textColor="@color/white"
+            android:text="NEXT"
             android:gravity="center"
             android:id="@+id/ad_call_to_action"
-            android:background="@drawable/ad_button_bg"
+            android:background="@drawable/ad_onboarding_button_bg"
             android:stateListAnimator="@null"
             android:textAllCaps="false"
-            android:paddingTop="14dp"
+            android:paddingTop="13dp"
             android:paddingBottom="13dp"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

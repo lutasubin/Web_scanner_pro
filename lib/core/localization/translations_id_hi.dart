@@ -24,6 +24,9 @@ const idTranslations = <String, String>{
   'history': 'Notifikasi tersimpan',
   'files': 'File tersimpan',
   'generic_error': 'Tindakan gagal. Silakan coba lagi.',
+  'onboarding_title_1': 'Pantau banyak akun di\nsatu perangkat',
+  'onboarding_title_2': 'Sinkronisasi otomatis\nyang cepat',
+  'onboarding_title_3': 'Kelola file yang\ndiunduh',
 };
 
 const hiTranslations = <String, String>{
@@ -51,4 +54,7 @@ const hiTranslations = <String, String>{
   'history': 'सहेजी गई सूचनाएँ',
   'files': 'सहेजी गई फ़ाइलें',
   'generic_error': 'कार्रवाई पूरी नहीं हुई। फिर कोशिश करें।',
+  'onboarding_title_1': 'एक ही डिवाइस पर कई खातों\nको ट्रैक करें',
+  'onboarding_title_2': 'तेज़ स्वचालित\nसिंक्रनाइज़ेशन',
+  'onboarding_title_3': 'डाउनलोड की गई फ़ाइलें\nप्रबंधित करें',
 };

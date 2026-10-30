@@ -35,11 +35,15 @@ class AdTestIds {
       '/21775744923/example/native';
   static const String androidNativeCollabId =
       '/21775744923/example/native-video';
+  static const String androidNativeOnboardingId =
+      '/21775744923/example/native-video';
   static const String iosNativePrimaryId =
       '/21775744923/example/native-video';
   static const String iosNativeFallbackId =
       'ca-app-pub-3940256099942544/3986624511';
   static const String iosNativeCollabId =
+      '/21775744923/example/native-video';
+  static const String iosNativeOnboardingId =
       '/21775744923/example/native-video';
 
   static String get appOpenAdUnitId =>

@@ -232,6 +232,11 @@ class _AdsDebugPageState extends State<AdsDebugPage> {
           ),
           _buildAdUnitRow(
             context,
+            rcKey: 'ad_unit_native_onboarding_android',
+            rx: _rc.adUnitNativeOnboardingAndroid,
+          ),
+          _buildAdUnitRow(
+            context,
             rcKey: 'ad_unit_native_collab_android',
             rx: _rc.adUnitNativeCollabAndroid,
           ),
@@ -368,6 +373,12 @@ class _AdsDebugPageState extends State<AdsDebugPage> {
             current: _rc.nativeLangStyle.value,
             max: 6,
             onChanged: (v) => _rc.nativeLangStyle.value = v,
+          ),
+          _buildStyleDropdown(
+            label: 'native_onboarding_style (Onboarding 3: 0..6, default=5)',
+            current: _rc.nativeOnboardingStyle.value,
+            max: 6,
+            onChanged: (v) => _rc.nativeOnboardingStyle.value = v,
           ),
           _buildStyleDropdown(
             label: 'native_home_collab_style (Home Bottom: 0=Banner, 6=Collab)',

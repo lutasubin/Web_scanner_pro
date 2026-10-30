@@ -11,6 +11,7 @@ import '../../features/home/home_controller.dart';
 import '../../features/help/how_to_use_page.dart';
 import '../../features/onboarding/feature_permission_onboarding.dart';
 import '../../features/onboarding/language_page.dart';
+import '../../features/onboarding/onboarding_page.dart';
 import '../../features/onboarding/splash_page.dart';
 import '../../features/sessions/sessions_page.dart';
 import '../../features/sessions/sessions_controller.dart';
@@ -29,6 +30,7 @@ class AppPages {
   static final routes = <GetPage<void>>[
     GetPage(name: AppRoutes.splash, page: SplashPage.new),
     GetPage(name: AppRoutes.languages, page: LanguagePage.new),
+    GetPage(name: AppRoutes.onboarding, page: OnboardingPage.new),
     GetPage(
       name: AppRoutes.home,
       page: HomePage.new,

@@ -31,6 +31,7 @@ class RemoteConfigService {
   // Exact defaults from original app (`frc_..._firebase_defaults.json`):
   // lang_style = 2, list_style = 2, exit_style = 2; Home uses Collapsible Banner (`bannerHomeCollapsible = true`).
   final nativeLangStyle = 2.obs;
+  final nativeOnboardingStyle = 5.obs;
   final nativeHomeCollabStyle = 0.obs;
   final nativeListStyle = 2.obs;
   final nativeExitStyle = 2.obs;
@@ -73,6 +74,8 @@ class RemoteConfigService {
   final adUnitNativeFallbackIos = AdTestIds.iosNativeFallbackId.obs;
   final adUnitNativeCollabAndroid = AdTestIds.androidNativeCollabId.obs;
   final adUnitNativeCollabIos = AdTestIds.iosNativeCollabId.obs;
+  final adUnitNativeOnboardingAndroid = AdTestIds.androidNativeOnboardingId.obs;
+  final adUnitNativeOnboardingIos = AdTestIds.iosNativeOnboardingId.obs;
 
   String get activeAppOpenAdUnitId =>
       (defaultTargetPlatform == TargetPlatform.iOS
@@ -118,6 +121,12 @@ class RemoteConfigService {
     return collabId.isNotEmpty ? collabId : activeNativeAdUnitId;
   }
 
+  String get activeNativeOnboardingAdUnitId =>
+      (defaultTargetPlatform == TargetPlatform.iOS
+              ? adUnitNativeOnboardingIos.value
+              : adUnitNativeOnboardingAndroid.value)
+          .trim();
+
   static const Map<String, dynamic> defaultParameters = <String, dynamic>{
     'ads_global_enabled': true,
     'unShowAd': false,
@@ -131,6 +140,8 @@ class RemoteConfigService {
     'inter_interval': 30,
     'native_lang_style': 2,
     'lang_style': 2,
+    'native_onboarding_style': 5,
+    'onboarding_style': 5,
     'native_home_collab_style': 0,
     'native_list_style': 2,
     'list_style': 2,
@@ -171,6 +182,8 @@ class RemoteConfigService {
     'ad_unit_native_fallback_ios': AdTestIds.iosNativeFallbackId,
     'ad_unit_native_collab_android': AdTestIds.androidNativeCollabId,
     'ad_unit_native_collab_ios': AdTestIds.iosNativeCollabId,
+    'ad_unit_native_onboarding_android': AdTestIds.androidNativeOnboardingId,
+    'ad_unit_native_onboarding_ios': AdTestIds.iosNativeOnboardingId,
   };
 
   Future<void> init() async {
@@ -259,6 +272,13 @@ class RemoteConfigService {
       defaultVal: 2,
       maxStyle: 6,
     );
+    nativeOnboardingStyle.value = _readStyleOrLegacy(
+      rc,
+      primaryKey: 'native_onboarding_style',
+      legacyKey: 'onboarding_style',
+      defaultVal: 5,
+      maxStyle: 6,
+    );
     nativeHomeCollabStyle.value = rc.getInt('native_home_collab_style').clamp(0, 6);
     nativeListStyle.value = _readStyleOrLegacy(
       rc,
@@ -323,6 +343,10 @@ class RemoteConfigService {
         rc.getString('ad_unit_native_collab_android').trim();
     adUnitNativeCollabIos.value =
         rc.getString('ad_unit_native_collab_ios').trim();
+    adUnitNativeOnboardingAndroid.value =
+        rc.getString('ad_unit_native_onboarding_android').trim();
+    adUnitNativeOnboardingIos.value =
+        rc.getString('ad_unit_native_onboarding_ios').trim();
   }
 
   int _readStyleOrLegacy(

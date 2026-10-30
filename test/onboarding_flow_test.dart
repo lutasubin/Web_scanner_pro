@@ -9,6 +9,7 @@ import 'package:web_scanner_pro/core/theme/app_theme.dart';
 import 'package:web_scanner_pro/features/home/home_page.dart';
 import 'package:web_scanner_pro/features/onboarding/feature_permission_onboarding.dart';
 import 'package:web_scanner_pro/features/onboarding/language_page.dart';
+import 'package:web_scanner_pro/features/onboarding/onboarding_page.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -137,5 +138,39 @@ void main() {
     );
     expect(find.text('Cho phép truy cập'), findsOneWidget);
     expect(find.text('Xem & Lưu Trạng thái'), findsOneWidget);
+  });
+
+  testWidgets('OnboardingPage steps through all 3 screens and shows START on step 3', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      GetMaterialApp(
+        theme: AppTheme.light,
+        translations: AppTranslations(),
+        locale: const Locale('vi'),
+        fallbackLocale: const Locale('en'),
+        home: const OnboardingPage(),
+      ),
+    );
+
+    expect(
+      find.text('Theo dõi nhiều tài khoản trên\nmột thiết bị'),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('onboarding-next-1')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('onboarding-next-1')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Tự động đồng bộ nhanh\nchóng'), findsOneWidget);
+    expect(find.byKey(const Key('onboarding-next-2')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('onboarding-next-2')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Quản lý tệp đã tải\nxuống'), findsOneWidget);
+    expect(find.byKey(const Key('onboarding-start')), findsOneWidget);
+    expect(find.text('START'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

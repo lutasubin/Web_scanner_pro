@@ -88,6 +88,7 @@ class AdService with WidgetsBindingObserver {
         // Pre-warm Native Ad queues for active styles on iOS
         final activeStyles = <int>{
           rc.nativeLangStyle.value,
+          rc.nativeOnboardingStyle.value,
           rc.nativeHomeCollabStyle.value,
           rc.nativeListStyle.value,
           rc.nativeExitStyle.value,
@@ -188,9 +189,11 @@ class AdService with WidgetsBindingObserver {
         rc.adUnitInterstitialIos,
         rc.adUnitNativeAndroid,
         rc.adUnitNativeCollabAndroid,
+        rc.adUnitNativeOnboardingAndroid,
         rc.adUnitNativeFallbackAndroid,
         rc.adUnitNativeIos,
         rc.adUnitNativeCollabIos,
+        rc.adUnitNativeOnboardingIos,
         rc.adUnitNativeFallbackIos,
       ],
       (_) {
@@ -220,6 +223,7 @@ class AdService with WidgetsBindingObserver {
         } else {
           final activeStyles = <int>{
             rc.nativeLangStyle.value,
+            rc.nativeOnboardingStyle.value,
             rc.nativeHomeCollabStyle.value,
             rc.nativeListStyle.value,
             rc.nativeExitStyle.value,
@@ -567,6 +571,25 @@ class AdService with WidgetsBindingObserver {
       Future<void>.delayed(const Duration(seconds: 2), refreshNativeQueueCount);
       Future<void>.delayed(const Duration(seconds: 4), refreshNativeQueueCount);
     } catch (_) {}
+  }
+
+  Future<void> preloadOnboardingNativeAd() async {
+    if (!isSupportedPlatform || !rc.adsGlobalEnabled.value) return;
+    final unitId = rc.activeNativeOnboardingAdUnitId;
+    if (unitId.isEmpty || rc.nativeOnboardingStyle.value <= 0) return;
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      try {
+        await _platformChannel.invokeMethod<int>(
+          'preloadNativeAds',
+          <String, Object?>{
+            'adUnitId': unitId,
+            'fallbackAdUnitId': rc.activeNativeFallbackAdUnitId,
+          },
+        );
+      } catch (_) {}
+    } else {
+      replenishNativeQueue(rc.nativeOnboardingStyle.value);
+    }
   }
 
   Future<void> refreshNativeQueueCount() async {

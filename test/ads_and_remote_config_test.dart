@@ -29,6 +29,7 @@ void main() {
     expect(rc.hotOpenIntervalSec.value, 10);
     expect(rc.interIntervalSec.value, 30);
     expect(rc.nativeLangStyle.value, 2);
+    expect(rc.nativeOnboardingStyle.value, 5);
     expect(rc.nativeHomeCollabStyle.value, 0);
     expect(rc.nativeListStyle.value, 2);
     expect(rc.nativeExitStyle.value, 2);
@@ -43,6 +44,7 @@ void main() {
     expect(rc.activeBannerAdUnitId, isNotEmpty);
     expect(rc.activeCollapsibleBannerAdUnitId, isNotEmpty);
     expect(rc.activeNativeAdUnitId, isNotEmpty);
+    expect(rc.activeNativeOnboardingAdUnitId, isNotEmpty);
     expect(rc.activeNativeCollabAdUnitId, isNotEmpty);
   });
 

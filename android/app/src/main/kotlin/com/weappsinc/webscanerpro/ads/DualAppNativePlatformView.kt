@@ -52,6 +52,7 @@ object DualAppNativeAdManager {
 
     private data class CachedNativeAd(
         val ad: NativeAd,
+        val unitId: String,
         val loadedAtMs: Long = System.currentTimeMillis(),
         val ttlMs: Long = 3_600_000L, // 1 hour expiry (`yl/i.java:132`)
     ) {
@@ -82,15 +83,11 @@ object DualAppNativeAdManager {
             appContext = context.applicationContext
             val trimmedPrimary = adUnitId.trim()
             val trimmedFallback = fallbackUnitId.trim()
-            val changed = trimmedPrimary.isNotEmpty() && trimmedPrimary != primaryAdUnitId
             if (trimmedPrimary.isNotEmpty()) {
                 primaryAdUnitId = trimmedPrimary
             }
             if (trimmedFallback.isNotEmpty()) {
                 fallbackAdUnitId = trimmedFallback
-            }
-            if (changed) {
-                clearCache()
             }
             replenishQueue()
         }
@@ -131,17 +128,16 @@ object DualAppNativeAdManager {
     ) {
         mainHandler.post {
             appContext = context.applicationContext
-            if (requestedAdUnitId.isNotBlank()) {
-                primaryAdUnitId = requestedAdUnitId.trim()
-            }
-            if (requestedFallbackUnitId.isNotBlank()) {
-                fallbackAdUnitId = requestedFallbackUnitId.trim()
-            }
+            val targetUnitId = requestedAdUnitId.trim().ifEmpty { primaryAdUnitId }
+            val targetFallbackId = requestedFallbackUnitId.trim().ifEmpty { fallbackAdUnitId }
 
             var popped: NativeAd? = null
             synchronized(cacheQueue) {
                 pruneExpiredLocked()
-                if (cacheQueue.isNotEmpty()) {
+                val matchIdx = cacheQueue.indexOfFirst { it.unitId == targetUnitId }
+                if (matchIdx >= 0) {
+                    popped = cacheQueue.removeAt(matchIdx).ad
+                } else if (cacheQueue.isNotEmpty() && targetUnitId == primaryAdUnitId) {
                     popped = cacheQueue.removeAt(0).ad
                 }
             }
@@ -153,12 +149,17 @@ object DualAppNativeAdManager {
             } else {
                 pendingConsumers.add(
                     PendingRequest(
-                        adUnitId = primaryAdUnitId,
-                        fallbackAdUnitId = fallbackAdUnitId,
+                        adUnitId = targetUnitId,
+                        fallbackAdUnitId = targetFallbackId,
                         onResult = onResult,
                     ),
                 )
-                replenishQueue()
+                loadSingleNativeAd(
+                    context = context.applicationContext,
+                    unitId = targetUnitId,
+                    fallbackId = targetFallbackId,
+                    isFallbackRetry = false,
+                )
             }
         }
     }
@@ -208,13 +209,20 @@ object DualAppNativeAdManager {
                 mainHandler.post {
                     inFlightLoads = (inFlightLoads - 1).coerceAtLeast(0)
                     if (pendingConsumers.isNotEmpty()) {
-                        val consumer = pendingConsumers.removeAt(0)
+                        val matchIdx = pendingConsumers.indexOfFirst {
+                            it.adUnitId == unitId || (isFallbackRetry && it.fallbackAdUnitId == unitId)
+                        }
+                        val consumer = if (matchIdx >= 0) {
+                            pendingConsumers.removeAt(matchIdx)
+                        } else {
+                            pendingConsumers.removeAt(0)
+                        }
                         consumer.onResult(nativeAd, null)
                     } else {
                         synchronized(cacheQueue) {
                             pruneExpiredLocked()
                             if (cacheQueue.size < MAX_CACHE) {
-                                cacheQueue.add(CachedNativeAd(nativeAd))
+                                cacheQueue.add(CachedNativeAd(nativeAd, unitId))
                             } else {
                                 nativeAd.destroy()
                             }
@@ -309,9 +317,13 @@ object DualAppNativeAdManager {
 
         if (iconView != null) {
             val iconDrawable = nativeAd.icon?.drawable ?: nativeAd.images.firstOrNull()?.drawable
-            iconView.visibility = if (iconDrawable == null) View.GONE else View.VISIBLE
             if (iconDrawable != null) {
+                iconView.visibility = View.VISIBLE
                 iconView.setImageDrawable(iconDrawable)
+            } else if (iconView.background != null) {
+                iconView.visibility = View.VISIBLE
+            } else {
+                iconView.visibility = View.GONE
             }
         }
 
@@ -411,6 +423,19 @@ class DualAppNativePlatformView(
                 mapOf("available" to false, "error" to "Disabled by config"),
             )
         } else {
+            val layoutRes = DualAppNativeAdManager.LAYOUT_RES_IDS[styleIndex]
+            val inflated = LayoutInflater.from(activity).inflate(layoutRes, frameLayout, false) as NativeAdView
+            currentAdView = inflated
+            frameLayout.visibility = View.VISIBLE
+            frameLayout.removeAllViews()
+            frameLayout.addView(
+                inflated,
+                FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ),
+            )
+
             DualAppNativeAdManager.acquireNativeAd(
                 context = activity,
                 requestedAdUnitId = adUnitId,
@@ -433,22 +458,10 @@ class DualAppNativePlatformView(
                 }
 
                 currentNativeAd = nativeAd
-                val layoutRes = DualAppNativeAdManager.LAYOUT_RES_IDS[styleIndex]
-                val inflated = LayoutInflater.from(activity).inflate(layoutRes, frameLayout, false) as NativeAdView
-                currentAdView = inflated
-
-                frameLayout.visibility = View.VISIBLE
-                frameLayout.removeAllViews()
-                frameLayout.addView(
-                    inflated,
-                    FrameLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT,
-                    ),
-                )
+                val activeView = currentAdView ?: inflated
 
                 DualAppNativeAdManager.bindNativeAdView(
-                    nativeAdView = inflated,
+                    nativeAdView = activeView,
                     nativeAd = nativeAd,
                     isCollabCollapsed = (rawStyle == 6 && initialCollapsed),
                 )

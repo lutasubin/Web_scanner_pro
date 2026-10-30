@@ -21,6 +21,9 @@ const koTranslations = <String, String>{
   'history': '저장된 알림',
   'files': '저장된 파일',
   'generic_error': '작업을 완료할 수 없습니다. 다시 시도하세요.',
+  'onboarding_title_1': '하나의 기기에서 여러 계정\n추적하기',
+  'onboarding_title_2': '빠른 자동 동기화',
+  'onboarding_title_3': '다운로드한 파일 관리',
 };
 
 const jaTranslations = <String, String>{
@@ -46,4 +49,7 @@ const jaTranslations = <String, String>{
   'history': '保存済み通知',
   'files': '保存済みファイル',
   'generic_error': '操作を完了できません。もう一度お試しください。',
+  'onboarding_title_1': '1台の端末で複数のアカウントを\n管理',
+  'onboarding_title_2': '高速な自動同期',
+  'onboarding_title_3': 'ダウンロードしたファイルを管理',
 };

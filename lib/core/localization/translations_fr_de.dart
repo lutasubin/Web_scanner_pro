@@ -24,6 +24,9 @@ const frTranslations = <String, String>{
   'history': 'Notifications enregistrées',
   'files': 'Fichiers enregistrés',
   'generic_error': 'Action impossible. Réessayez.',
+  'onboarding_title_1': 'Suivez plusieurs comptes sur\nun seul appareil',
+  'onboarding_title_2': 'Synchronisation automatique\nrapide',
+  'onboarding_title_3': 'Gérer les fichiers\ntéléchargés',
 };
 
 const deTranslations = <String, String>{
@@ -52,4 +55,7 @@ const deTranslations = <String, String>{
   'history': 'Gespeicherte Mitteilungen',
   'files': 'Gespeicherte Dateien',
   'generic_error': 'Aktion nicht möglich. Bitte erneut versuchen.',
+  'onboarding_title_1': 'Mehrere Konten auf einem\nGerät verfolgen',
+  'onboarding_title_2': 'Schnelle automatische\nSynchronisierung',
+  'onboarding_title_3': 'Heruntergeladene Dateien\nverwalten',
 };

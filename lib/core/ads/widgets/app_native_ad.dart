@@ -77,18 +77,18 @@ class _AppNativeAdState extends State<AppNativeAd> {
             if (widget.styleRx != null) widget.styleRx!,
             rc.adUnitNativeAndroid,
             rc.adUnitNativeCollabAndroid,
+            rc.adUnitNativeOnboardingAndroid,
             rc.adUnitNativeFallbackAndroid,
             rc.adUnitNativeIos,
             rc.adUnitNativeCollabIos,
+            rc.adUnitNativeOnboardingIos,
             rc.adUnitNativeFallbackIos,
           ],
           (_) {
             if (!mounted) return;
             if (_useAndroidPlatformView) {
               final nextStyle = _effectiveStyle;
-              final nextUnit = nextStyle == 6
-                  ? rc.activeNativeCollabAdUnitId
-                  : rc.activeNativeAdUnitId;
+              final nextUnit = _resolvePrimaryAdUnitId(nextStyle, rc);
               if (nextStyle != _lastStyle || nextUnit != _lastAdUnitId) {
                 setState(() {
                   _androidAdFailed = false;
@@ -140,6 +140,15 @@ class _AppNativeAdState extends State<AppNativeAd> {
     );
   }
 
+  String _resolvePrimaryAdUnitId(int style, RemoteConfigService rc) {
+    if (widget.placement == 'onboarding_page') {
+      return rc.activeNativeOnboardingAdUnitId;
+    }
+    return style == 6
+        ? rc.activeNativeCollabAdUnitId
+        : rc.activeNativeAdUnitId;
+  }
+
   void _loadIosAdForCurrentStyle() {
     if (_useAndroidPlatformView) return;
     if (!services.isRegistered<AdService>() ||
@@ -151,9 +160,7 @@ class _AppNativeAdState extends State<AppNativeAd> {
     if (!adService.isSupportedPlatform) return;
 
     final style = _effectiveStyle;
-    final primaryUnitId = style == 6
-        ? rc.activeNativeCollabAdUnitId
-        : rc.activeNativeAdUnitId;
+    final primaryUnitId = _resolvePrimaryAdUnitId(style, rc);
     if (!rc.adsGlobalEnabled.value || style <= 0 || primaryUnitId.isEmpty) {
       _disposeIosAd();
       if (mounted) setState(() {});
@@ -244,7 +251,7 @@ class _AppNativeAdState extends State<AppNativeAd> {
       case 4:
         return 146;
       case 5:
-        return 158;
+        return 168;
       case 6:
         return isCollabCollapsed ? 80 : 254;
       default:
@@ -296,9 +303,7 @@ class _AppNativeAdState extends State<AppNativeAd> {
   }
 
   Widget _buildPlatformAd(int style, RemoteConfigService rc) {
-    final adUnitId = style == 6
-        ? rc.activeNativeCollabAdUnitId
-        : rc.activeNativeAdUnitId;
+    final adUnitId = _resolvePrimaryAdUnitId(style, rc);
     if (adUnitId.isEmpty) return const SizedBox.shrink();
 
     if (_useAndroidPlatformView) {
@@ -664,13 +669,92 @@ class _NativeAdTemplatePreviewState extends State<NativeAdTemplatePreview> {
     ],
   );
 
-  // Style 5: `ad_native_btn_bottom.xml` (Top Info Row + 24dp margin + Bottom Full-Width `#00C667` CTA)
+  // Style 5: `ad_native_btn_bottom.xml` (Top Icon + Info Row + Bottom Full-Width `#0FBC5D` CTA)
   Widget _buildStyle5BtnBottom() => Column(
     mainAxisSize: MainAxisSize.min,
     children: [
-      _buildInfoRow(),
-      const SizedBox(height: 24),
-      _buildFullWidthCtaButton(),
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: const Color(0xFFD9DADB),
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Test Ad : Investment Management',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF111111),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 3,
+                        vertical: 1,
+                      ),
+                      color: const Color(0xFFD9D9D9),
+                      child: const Text(
+                        'AD',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    const Expanded(
+                      child: Text(
+                        'Mutual Funds',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF7A7A7A),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 16),
+      Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: const Color(0xFF0FBC5D),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Text(
+          'NEXT',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
     ],
   );
 }

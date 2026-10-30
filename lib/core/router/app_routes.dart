@@ -2,6 +2,7 @@ class AppRoutes {
   AppRoutes._();
   static const splash = '/splash';
   static const languages = '/languages';
+  static const onboarding = '/onboarding';
   static const home = '/';
   static const sessions = '/sessions';
   static const statuses = '/statuses';
