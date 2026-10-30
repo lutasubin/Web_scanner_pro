@@ -3,12 +3,10 @@ package com.weappsinc.webscanerpro.ads
 import android.app.Activity
 import android.content.Context
 import android.os.Bundle
-import android.util.DisplayMetrics
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import android.widget.RelativeLayout
 import com.google.ads.mediation.admob.AdMobAdapter
 import com.google.android.gms.ads.AdListener
 import com.google.android.gms.ads.AdRequest
@@ -25,7 +23,7 @@ import io.flutter.plugin.platform.PlatformViewFactory
  * Mirrors original app's `jc/f.java` + `jc/e.java` + `zl/e.java` + `yl/h.java`:
  * Registers `"com.example.dual_app/banner_ad"` and creates `AdView(activity)` with the real
  * `Activity` context so Google AdMob's Collapsible Banner (`collapsible: bottom`) expands into
- * the half-screen overlay with the circular `⌄` collapse button (`orig_home_after_ad.png`).
+ * a full-width overlay with the circular `⌄` collapse button (`orig_home_after_ad.png`).
  */
 class DualAppBannerFactory(
     private val messenger: BinaryMessenger,
@@ -36,7 +34,6 @@ class DualAppBannerFactory(
         @Suppress("UNCHECKED_CAST")
         val params = args as? Map<String, Any?>
         return DualAppBannerPlatformView(
-            context = context,
             activity = activityProvider(),
             messenger = messenger,
             viewId = viewId,
@@ -46,23 +43,29 @@ class DualAppBannerFactory(
 }
 
 class DualAppBannerPlatformView(
-    context: Context,
-    activity: Activity,
+    private val activity: Activity,
     messenger: BinaryMessenger,
     viewId: Int,
     params: Map<String, Any?>?,
 ) : PlatformView {
 
-    private val rootLayout = RelativeLayout(context)
+    // Always use the real Activity context (not a VirtualDisplay context) so AdMob's
+    // Collapsible Banner PopupWindow measures full window bounds accurately.
+    private val rootLayout = FrameLayout(activity).apply {
+        layoutParams = FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT,
+        )
+    }
     private val channel = MethodChannel(messenger, "com.example.dual_app/banner_ad/$viewId")
     private var adView: AdView? = null
+    private var disposed = false
+    private val isCollapsible: Boolean = (params?.get("isCollapsible") as? Boolean) ?: false
 
     init {
         channel.setMethodCallHandler { _, result -> result.notImplemented() }
 
         val adUnitId = (params?.get("adUnitId") as? String)?.trim().orEmpty()
-        val isCollapsible = (params?.get("isCollapsible") as? Boolean) ?: false
-        val requestedWidthDp = (params?.get("widthDp") as? Number)?.toInt() ?: 0
 
         if (adUnitId.isEmpty()) {
             channel.invokeMethod(
@@ -70,39 +73,34 @@ class DualAppBannerPlatformView(
                 mapOf("available" to false, "error" to "Empty adUnitId"),
             )
         } else {
-            val frameLayout = FrameLayout(activity)
-            val lp = RelativeLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply {
-                addRule(RelativeLayout.CENTER_IN_PARENT)
+            if (isCollapsible) {
+                // Ensure any previous collapsible banner popup is dismissed before creating a new one
+                activeCollapsibleView?.let { prev ->
+                    if (prev !== this) {
+                        prev.destroyBannerOnly()
+                    }
+                }
+                activeCollapsibleView = this
             }
-            rootLayout.addView(frameLayout, lp)
 
-            val displayMetrics = DisplayMetrics()
-            @Suppress("DEPRECATION")
-            activity.windowManager.defaultDisplay.getMetrics(displayMetrics)
+            val displayMetrics = activity.resources.displayMetrics
             val density = if (displayMetrics.density > 0f) displayMetrics.density else 1f
-            val widthDp = if (requestedWidthDp > 0) {
-                requestedWidthDp
-            } else {
-                (displayMetrics.widthPixels / density).toInt().coerceAtLeast(320)
-            }
+            val screenWidthDp = (displayMetrics.widthPixels / density).toInt().coerceAtLeast(320)
 
-            val adSize = AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(activity, widthDp)
+            val adSize = AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(activity, screenWidthDp)
             val banner = AdView(activity).apply {
                 this.adUnitId = adUnitId
                 setAdSize(adSize)
             }
             adView = banner
 
-            frameLayout.removeAllViews()
-            frameLayout.addView(
+            rootLayout.removeAllViews()
+            rootLayout.addView(
                 banner,
                 FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT,
-                    Gravity.CENTER,
+                    Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL,
                 ),
             )
 
@@ -119,6 +117,7 @@ class DualAppBannerPlatformView(
 
             banner.adListener = object : AdListener() {
                 override fun onAdLoaded() {
+                    if (disposed) return
                     val actualSize = banner.adSize ?: adSize
                     channel.invokeMethod(
                         "adStatus",
@@ -131,6 +130,7 @@ class DualAppBannerPlatformView(
                 }
 
                 override fun onAdFailedToLoad(error: LoadAdError) {
+                    if (disposed) return
                     channel.invokeMethod(
                         "adStatus",
                         mapOf(
@@ -141,14 +141,17 @@ class DualAppBannerPlatformView(
                 }
             }
 
-            banner.loadAd(adRequest)
+            // Defer loadAd until rootLayout is attached and laid out in the Activity window
+            // so AdMob's Collapsible Banner PopupWindow anchors to full screen width.
+            rootLayout.post {
+                if (!disposed && adView === banner) {
+                    banner.loadAd(adRequest)
+                }
+            }
         }
     }
 
-    override fun getView(): View = rootLayout
-
-    override fun dispose() {
-        channel.setMethodCallHandler(null)
+    internal fun destroyBannerOnly() {
         rootLayout.removeAllViews()
         adView?.let { banner ->
             (banner.parent as? ViewGroup)?.removeView(banner)
@@ -156,5 +159,21 @@ class DualAppBannerPlatformView(
             banner.destroy()
         }
         adView = null
+    }
+
+    override fun getView(): View = rootLayout
+
+    override fun dispose() {
+        disposed = true
+        if (activeCollapsibleView === this) {
+            activeCollapsibleView = null
+        }
+        channel.setMethodCallHandler(null)
+        destroyBannerOnly()
+    }
+
+    companion object {
+        @Volatile
+        private var activeCollapsibleView: DualAppBannerPlatformView? = null
     }
 }

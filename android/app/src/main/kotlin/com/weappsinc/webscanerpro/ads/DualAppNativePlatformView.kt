@@ -387,7 +387,7 @@ class DualAppNativePlatformView(
     params: Map<String, Any?>?,
 ) : PlatformView {
 
-    private val frameLayout = FrameLayout(context)
+    private val frameLayout = FrameLayout(activity)
     private val channel = MethodChannel(messenger, "com.example.dual_app/native_ad/$viewId")
     private var currentNativeAd: NativeAd? = null
     private var currentAdView: NativeAdView? = null

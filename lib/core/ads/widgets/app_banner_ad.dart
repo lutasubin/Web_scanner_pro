@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -11,11 +13,11 @@ import '../remote_config_service.dart';
 /// Renders an Anchored Adaptive Banner (or Collapsible Banner when [collapsibleFlag] is true)
 /// at the bottom of a screen, controlled dynamically by Firebase Remote Config.
 ///
-/// On Android, uses the native `com.example.dual_app/banner_ad` PlatformView
-/// (`DualAppBannerPlatformView`, matching `jc/e.java` + `zl/e.java` + `yl/h.java`
-/// in the original app) so `AdView(activity)` has the real `Activity` context and
-/// Google AdMob's Collapsible Banner (`collapsible: bottom`) expands into the
-/// half-screen overlay with the circular `⌄` collapse button (`orig_home_after_ad.png`).
+/// On Android, uses Hybrid Composition (`PlatformViewLink` + `initExpensiveAndroidView`)
+/// with `com.example.dual_app/banner_ad` (`DualAppBannerPlatformView`) so `AdView(activity)`
+/// is attached directly to the real `Activity` window hierarchy and Google AdMob's
+/// Collapsible Banner (`collapsible: bottom`) expands across 100% of the screen width
+/// without VirtualDisplay clipping or duplicate overlapping banners.
 class AppBannerAd extends StatefulWidget {
   const AppBannerAd({
     super.key,
@@ -33,6 +35,8 @@ class AppBannerAd extends StatefulWidget {
 }
 
 class _AppBannerAdState extends State<AppBannerAd> {
+  static final RxBool _nonCollapsibleRx = false.obs;
+
   // Android PlatformView state (`com.example.dual_app/banner_ad`)
   MethodChannel? _androidViewChannel;
   bool _androidAdFailed = false;
@@ -54,8 +58,10 @@ class _AppBannerAdState extends State<AppBannerAd> {
       defaultTargetPlatform == TargetPlatform.android &&
       !Get.testMode;
 
+  /// Only use collapsible banner when explicitly passed (e.g. Home / Settings).
+  /// Feature sub-pages without `collapsibleFlag` use standard Anchored Adaptive Banner.
   RxBool _effectiveCollapsibleRx(RemoteConfigService rc) =>
-      widget.collapsibleFlag ?? rc.bannerHomeCollapsible;
+      widget.collapsibleFlag ?? _nonCollapsibleRx;
 
   @override
   void initState() {
@@ -253,6 +259,13 @@ class _AppBannerAdState extends State<AppBannerAd> {
       return const SizedBox.shrink();
     }
 
+    // Hide the banner when its route is covered by another route on the stack
+    // so an underlying Collapsible Banner PopupWindow never bleeds through.
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) {
+      return const SizedBox.shrink();
+    }
+
     return Obx(() {
       final enabled = rc.adsGlobalEnabled.value && widget.enabledFlag.value;
       if (!enabled) return const SizedBox.shrink();
@@ -269,6 +282,14 @@ class _AppBannerAdState extends State<AppBannerAd> {
         _lastCollapsible = isCollapsible;
         _lastAdUnitId = adUnitId;
 
+        const viewType = 'com.example.dual_app/banner_ad';
+        final creationParams = <String, Object?>{
+          'placement': widget.placement,
+          'isCollapsible': isCollapsible,
+          'adUnitId': adUnitId,
+          'widthDp': screenWidthDp > 0 ? screenWidthDp : 360,
+        };
+
         return ColoredBox(
           color: Colors.white,
           child: SafeArea(
@@ -276,19 +297,33 @@ class _AppBannerAdState extends State<AppBannerAd> {
             child: SizedBox(
               width: double.infinity,
               height: _androidHeightDp,
-              child: AndroidView(
+              child: PlatformViewLink(
                 key: ValueKey<String>(
                   'dual_app_banner_${widget.placement}_${adUnitId}_${isCollapsible}_$_reloadToken',
                 ),
-                viewType: 'com.example.dual_app/banner_ad',
-                creationParams: <String, Object?>{
-                  'placement': widget.placement,
-                  'isCollapsible': isCollapsible,
-                  'adUnitId': adUnitId,
-                  'widthDp': screenWidthDp > 0 ? screenWidthDp : 360,
-                },
-                creationParamsCodec: const StandardMessageCodec(),
-                onPlatformViewCreated: _onAndroidPlatformViewCreated,
+                viewType: viewType,
+                surfaceFactory: (context, controller) => AndroidViewSurface(
+                  controller: controller as AndroidViewController,
+                  gestureRecognizers:
+                      const <Factory<OneSequenceGestureRecognizer>>{},
+                  hitTestBehavior: PlatformViewHitTestBehavior.opaque,
+                ),
+                onCreatePlatformView: (params) =>
+                    PlatformViewsService.initExpensiveAndroidView(
+                      id: params.id,
+                      viewType: viewType,
+                      layoutDirection: TextDirection.ltr,
+                      creationParams: creationParams,
+                      creationParamsCodec: const StandardMessageCodec(),
+                      onFocus: () => params.onFocusChanged(true),
+                    )
+                      ..addOnPlatformViewCreatedListener(
+                        params.onPlatformViewCreated,
+                      )
+                      ..addOnPlatformViewCreatedListener(
+                        _onAndroidPlatformViewCreated,
+                      )
+                      ..create(),
               ),
             ),
           ),
