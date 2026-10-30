@@ -6,10 +6,13 @@ import 'package:web_scanner_pro/core/di/di.dart';
 import 'package:web_scanner_pro/core/localization/app_translations.dart';
 import 'package:web_scanner_pro/core/platform/app_platform.dart';
 import 'package:web_scanner_pro/core/theme/app_theme.dart';
+import 'package:web_scanner_pro/core/router/app_pages.dart';
+import 'package:web_scanner_pro/core/router/app_routes.dart';
 import 'package:web_scanner_pro/features/home/home_page.dart';
 import 'package:web_scanner_pro/features/onboarding/feature_permission_onboarding.dart';
 import 'package:web_scanner_pro/features/onboarding/language_page.dart';
 import 'package:web_scanner_pro/features/onboarding/onboarding_page.dart';
+import 'package:web_scanner_pro/features/settings/settings_page.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -69,6 +72,8 @@ void main() {
     );
 
     expect(find.text('Chọn ngôn ngữ'), findsOneWidget);
+    expect(find.text('🇻🇳'), findsOneWidget);
+    expect(find.text('🇺🇸'), findsOneWidget);
     expect(find.text('Tiếng Việt'), findsOneWidget);
     expect(find.text('English'), findsOneWidget);
 
@@ -171,6 +176,45 @@ void main() {
     expect(find.text('Quản lý tệp đã tải\nxuống'), findsOneWidget);
     expect(find.byKey(const Key('onboarding-start')), findsOneWidget);
     expect(find.text('START'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('SettingsPage updates language immediately when returning from LanguagePage', (
+    tester,
+  ) async {
+    savedSettings['onboardingDone'] = true;
+    await configureDependencies(platform: AppPlatform(channel: channel));
+
+    await tester.pumpWidget(
+      GetMaterialApp(
+        theme: AppTheme.light,
+        translations: AppTranslations(),
+        locale: const Locale('vi'),
+        fallbackLocale: const Locale('en'),
+        initialRoute: AppRoutes.settings,
+        getPages: AppPages.routes,
+        home: const SettingsPage(),
+      ),
+    );
+
+    expect(find.text('Cài đặt'), findsOneWidget);
+    expect(find.text('Ngôn ngữ'), findsOneWidget);
+    expect(find.text('Chia sẻ ứng dụng'), findsOneWidget);
+    expect(find.text('Chính sách bảo mật'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('settings-language')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('lang-en')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('confirm-language')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Settings'), findsOneWidget);
+    expect(find.text('Language'), findsOneWidget);
+    expect(find.text('Share App'), findsOneWidget);
+    expect(find.text('Privacy Policy'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

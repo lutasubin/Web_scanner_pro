@@ -133,6 +133,9 @@ class _LanguagePageState extends State<LanguagePage> {
   void _selectLanguage(String code) {
     setState(() => _selectedCode = code);
     _applyLocale(code);
+    if (!_fromSplash) {
+      _prefs.update({'languageCode': code});
+    }
   }
 
   void _applyLocale(String code) {
@@ -205,6 +208,11 @@ class _LanguagePageState extends State<LanguagePage> {
                           ),
                           child: Row(
                             children: [
+                              Text(
+                                item.flag,
+                                style: const TextStyle(fontSize: 24),
+                              ),
+                              const SizedBox(width: 14),
                               Expanded(
                                 child: Text(
                                   item.nativeName,

@@ -3,6 +3,8 @@ const viTranslations = <String, String>{
   'done': 'Xong',
   'settings': 'Cài đặt',
   'language': 'Ngôn ngữ',
+  'share_app': 'Chia sẻ ứng dụng',
+  'privacy_policy': 'Chính sách bảo mật',
   'replay_onboarding': 'Xem lại luồng giới thiệu',
   'replay_onboarding_subtitle':
       'Mở lại màn hình khởi động, chọn ngôn ngữ và hướng dẫn quyền.',
@@ -34,6 +36,8 @@ const enTranslations = <String, String>{
   'done': 'Done',
   'settings': 'Settings',
   'language': 'Language',
+  'share_app': 'Share App',
+  'privacy_policy': 'Privacy Policy',
   'replay_onboarding': 'Replay onboarding',
   'replay_onboarding_subtitle':
       'Open the welcome flow, choose a language, and review permissions.',

@@ -3,6 +3,8 @@ const idTranslations = <String, String>{
   'done': 'Selesai',
   'settings': 'Pengaturan',
   'language': 'Bahasa',
+  'share_app': 'Bagikan Aplikasi',
+  'privacy_policy': 'Kebijakan Privasi',
   'replay_onboarding': 'Ulangi pengenalan',
   'replay_onboarding_subtitle':
       'Buka kembali pengenalan, bahasa, dan panduan izin.',
@@ -34,6 +36,8 @@ const hiTranslations = <String, String>{
   'done': 'पूर्ण',
   'settings': 'सेटिंग्स',
   'language': 'भाषा',
+  'share_app': 'ऐप शेयर करें',
+  'privacy_policy': 'गोपनीयता नीति',
   'replay_onboarding': 'परिचय फिर देखें',
   'replay_onboarding_subtitle': 'स्वागत, भाषा और अनुमति निर्देश फिर से खोलें।',
   'privacy_note':

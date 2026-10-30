@@ -8,11 +8,17 @@ import '../../core/ads/remote_config_service.dart';
 import '../../core/ads/widgets/app_banner_ad.dart';
 import '../../core/di/di.dart';
 import '../../core/platform/app_platform.dart';
+import '../../core/repositories/preferences_repository.dart';
 import '../../core/router/app_routes.dart';
 
-class SettingsPage extends StatelessWidget {
+class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
 
+  @override
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
   static const _kPlayStoreUrl =
       'https://play.google.com/store/apps/details?id=com.weappsinc.webscanerpro';
 
@@ -60,61 +66,78 @@ class SettingsPage extends StatelessWidget {
     }
   }
 
+  Future<void> _openLanguagePage() async {
+    await Get.toNamed<void>(
+      AppRoutes.languages,
+      arguments: const {'fromSplash': false},
+    );
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFFF5F6F8),
-    bottomNavigationBar: services.isRegistered<RemoteConfigService>()
-        ? AppBannerAd(
-            placement: 'settings_page',
-            enabledFlag:
-                services<RemoteConfigService>().bannerSettingsEnabled,
-            collapsibleFlag:
-                services<RemoteConfigService>().bannerSettingsCollapsible,
-          )
-        : null,
-    appBar: AppBar(
+  Widget build(BuildContext context) {
+    Widget buildContent() => Scaffold(
       backgroundColor: const Color(0xFFF5F6F8),
-      title: Text(
-        'settings'.tr,
-        style: const TextStyle(fontWeight: FontWeight.w800),
+      bottomNavigationBar: services.isRegistered<RemoteConfigService>()
+          ? AppBannerAd(
+              placement: 'settings_page',
+              enabledFlag:
+                  services<RemoteConfigService>().bannerSettingsEnabled,
+              collapsibleFlag:
+                  services<RemoteConfigService>().bannerSettingsCollapsible,
+            )
+          : null,
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFF5F6F8),
+        title: Text(
+          'settings'.tr,
+          style: const TextStyle(fontWeight: FontWeight.w800),
+        ),
       ),
-    ),
-    body: SafeArea(
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 600),
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 28),
-            children: [
-              _SettingRowCard(
-                key: const Key('settings-language'),
-                icon: Icons.language_rounded,
-                title: 'language'.tr,
-                onTap: () => Get.toNamed<void>(
-                  AppRoutes.languages,
-                  arguments: const {'fromSplash': false},
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 600),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 28),
+              children: [
+                _SettingRowCard(
+                  key: const Key('settings-language'),
+                  icon: Icons.language_rounded,
+                  title: 'language'.tr,
+                  onTap: _openLanguagePage,
                 ),
-              ),
-              const SizedBox(height: 12),
-              _SettingRowCard(
-                key: const Key('settings-share'),
-                icon: Icons.share_outlined,
-                title: 'Share APP',
-                onTap: () => _shareApp(context),
-              ),
-              const SizedBox(height: 12),
-              _SettingRowCard(
-                key: const Key('settings-privacy'),
-                icon: Icons.verified_user_outlined,
-                title: 'Privacy Policy',
-                onTap: () => _openPrivacyPolicy(context),
-              ),
-            ],
+                const SizedBox(height: 12),
+                _SettingRowCard(
+                  key: const Key('settings-share'),
+                  icon: Icons.share_outlined,
+                  title: 'share_app'.tr,
+                  onTap: () => _shareApp(context),
+                ),
+                const SizedBox(height: 12),
+                _SettingRowCard(
+                  key: const Key('settings-privacy'),
+                  icon: Icons.verified_user_outlined,
+                  title: 'privacy_policy'.tr,
+                  onTap: () => _openPrivacyPolicy(context),
+                ),
+              ],
+            ),
           ),
         ),
       ),
-    ),
-  );
+    );
+
+    if (services.isRegistered<PreferencesRepository>()) {
+      return Obx(() {
+        final _ = services<PreferencesRepository>().value.value.languageCode;
+        return buildContent();
+      });
+    }
+    return buildContent();
+  }
 }
 
 class _SettingRowCard extends StatelessWidget {
@@ -164,4 +187,3 @@ class _SettingRowCard extends StatelessWidget {
     ),
   );
 }
-

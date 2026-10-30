@@ -3,6 +3,8 @@ const frTranslations = <String, String>{
   'done': 'Terminé',
   'settings': 'Paramètres',
   'language': 'Langue',
+  'share_app': 'Partager l’application',
+  'privacy_policy': 'Politique de confidentialité',
   'replay_onboarding': 'Revoir la présentation',
   'replay_onboarding_subtitle':
       'Rouvrez l’accueil, la langue et les autorisations.',
@@ -34,6 +36,8 @@ const deTranslations = <String, String>{
   'done': 'Fertig',
   'settings': 'Einstellungen',
   'language': 'Sprache',
+  'share_app': 'App teilen',
+  'privacy_policy': 'Datenschutzerklärung',
   'replay_onboarding': 'Einführung wiederholen',
   'replay_onboarding_subtitle':
       'Start, Sprache und Berechtigungen erneut anzeigen.',

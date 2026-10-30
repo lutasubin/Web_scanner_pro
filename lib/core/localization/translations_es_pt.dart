@@ -3,6 +3,8 @@ const esTranslations = <String, String>{
   'done': 'Listo',
   'settings': 'Ajustes',
   'language': 'Idioma',
+  'share_app': 'Compartir aplicación',
+  'privacy_policy': 'Política de privacidad',
   'replay_onboarding': 'Repetir introducción',
   'replay_onboarding_subtitle':
       'Vuelve a ver el inicio, el idioma y los permisos.',
@@ -34,6 +36,8 @@ const ptTranslations = <String, String>{
   'done': 'Concluir',
   'settings': 'Configurações',
   'language': 'Idioma',
+  'share_app': 'Compartilhar aplicativo',
+  'privacy_policy': 'Política de Privacidade',
   'replay_onboarding': 'Rever apresentação',
   'replay_onboarding_subtitle':
       'Abra novamente a introdução, o idioma e as permissões.',
