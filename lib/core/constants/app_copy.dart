@@ -1,7 +1,7 @@
 class AppCopy {
   AppCopy._();
 
-  static const appName = 'Web Scanner';
+  static const appName = 'WA Web Scanner - Dual App';
   static const home = 'Trang chủ';
   static const sessions = 'Tài khoản Web';
   static const statuses = 'Lưu trạng thái';

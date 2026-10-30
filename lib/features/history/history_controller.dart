@@ -12,7 +12,7 @@ class HistoryController extends TaskController {
   final AppPlatform _platform;
   final PreferencesRepository _preferences;
 
-  static const sampleTitle = 'Web Scanner - Dual App';
+  static const sampleTitle = 'WA Web Scanner - Dual App';
   static const samplePackage = 'scan.web.sample';
 
   final access = false.obs;

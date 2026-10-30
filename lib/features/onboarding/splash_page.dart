@@ -159,7 +159,7 @@ class _SplashPageState extends State<SplashPage>
                 ),
                 const SizedBox(height: 22),
                 const Text(
-                  'Web Scanner - Dual App',
+                  'WA Web Scanner - Dual App',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 22,

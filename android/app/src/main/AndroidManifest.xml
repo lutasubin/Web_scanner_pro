@@ -10,7 +10,7 @@
     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
     <application
-        android:label="Web Scanner Pro"
+        android:label="WA Web Scanner - Dual App"
         android:allowBackup="false"
         android:fullBackupContent="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -55,7 +55,7 @@
         </provider>
         <service
             android:name=".history.NotificationCaptureService"
-            android:label="Web Scanner Pro — lưu thông báo"
+            android:label="WA Web Scanner - Dual App"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
             android:exported="true">
             <intent-filter>

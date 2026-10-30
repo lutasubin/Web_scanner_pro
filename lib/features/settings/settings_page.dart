@@ -3,9 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../core/ads/ad_service.dart';
 import '../../core/ads/remote_config_service.dart';
 import '../../core/ads/widgets/app_banner_ad.dart';
 import '../../core/di/di.dart';
+import '../../core/platform/app_platform.dart';
 import '../../core/router/app_routes.dart';
 
 class SettingsPage extends StatelessWidget {
@@ -13,6 +15,9 @@ class SettingsPage extends StatelessWidget {
 
   static const _kPlayStoreUrl =
       'https://play.google.com/store/apps/details?id=com.weappsinc.webscanerpro';
+
+  static const _kPrivacyPolicyUrl =
+      'https://sites.google.com/view/wawebsanner/trang-ch%E1%BB%A7';
 
   Future<void> _shareApp(BuildContext context) async {
     try {
@@ -31,16 +36,28 @@ class SettingsPage extends StatelessWidget {
     }
   }
 
-  void _openDocumentPage(
-    BuildContext context, {
-    required String title,
-    required String body,
-  }) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => _LegalDocumentPage(title: title, body: body),
-      ),
-    );
+  Future<void> _openPrivacyPolicy(BuildContext context) async {
+    try {
+      if (services.isRegistered<AdService>()) {
+        services<AdService>().suppressNextHotOpen();
+      }
+      final platform = services.isRegistered<AppPlatform>()
+          ? services<AppPlatform>()
+          : AppPlatform();
+      await platform.invoke<void>(
+        'openExternalUrl',
+        const {'url': _kPrivacyPolicyUrl},
+      );
+    } catch (_) {
+      await Clipboard.setData(const ClipboardData(text: _kPrivacyPolicyUrl));
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Copied Privacy Policy link to clipboard!'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   @override
@@ -90,11 +107,7 @@ class SettingsPage extends StatelessWidget {
                 key: const Key('settings-privacy'),
                 icon: Icons.verified_user_outlined,
                 title: 'Privacy Policy',
-                onTap: () => _openDocumentPage(
-                  context,
-                  title: 'Privacy Policy',
-                  body: _kPrivacyPolicyText,
-                ),
+                onTap: () => _openPrivacyPolicy(context),
               ),
             ],
           ),
@@ -152,61 +165,3 @@ class _SettingRowCard extends StatelessWidget {
   );
 }
 
-class _LegalDocumentPage extends StatelessWidget {
-  const _LegalDocumentPage({required this.title, required this.body});
-
-  final String title;
-  final String body;
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: const Color(0xFFF5F6F8),
-    bottomNavigationBar: services.isRegistered<RemoteConfigService>()
-        ? AppBannerAd(
-            placement: 'settings_page',
-            enabledFlag:
-                services<RemoteConfigService>().bannerSettingsEnabled,
-            collapsibleFlag:
-                services<RemoteConfigService>().bannerSettingsCollapsible,
-          )
-        : null,
-    appBar: AppBar(
-      backgroundColor: Colors.white,
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
-    ),
-    body: SafeArea(
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 640),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(18),
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(18),
-                child: Text(
-                  body,
-                  style: const TextStyle(
-                    fontSize: 14.5,
-                    height: 1.55,
-                    color: Color(0xFF2C3631),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
-const _kPrivacyPolicyText = '''
-1. Local-First Privacy
-Your privacy is our top priority. Web Scanner - Dual App processes and stores all session cookies, notification history, and saved media strictly on your local device.
-
-2. Notification Access Permission
-When enabled by you, Notification Access is used solely to detect incoming WhatsApp messages locally on your device so you can view messages that were later deleted by the sender. Notification content is encrypted locally with AES-256 and is never transmitted to external servers.
-
-3. Storage & Folder Access
-Folder access (.Statuses) is used only to display and save status photos/videos at your explicit request.
-''';

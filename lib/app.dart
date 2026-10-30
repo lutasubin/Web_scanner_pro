@@ -22,7 +22,7 @@ class WebScannerApp extends StatelessWidget {
         : 'vi';
 
     return GetMaterialApp(
-      title: 'Web Scanner',
+      title: 'WA Web Scanner - Dual App',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       themeMode: ThemeMode.light,

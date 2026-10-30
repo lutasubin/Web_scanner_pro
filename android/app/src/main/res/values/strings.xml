@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Web Scanner Pro</string>
+    <string name="app_name">WA Web Scanner - Dual App</string>
     <string name="close">Đóng</string>
     <string name="reload">Tải lại</string>
     <string name="web_session_status">%1$s · Đang mở WhatsApp Web</string>

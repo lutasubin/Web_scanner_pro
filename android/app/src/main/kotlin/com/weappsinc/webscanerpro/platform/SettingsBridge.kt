@@ -1,10 +1,12 @@
 package com.weappsinc.webscanerpro.platform
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 
-class SettingsBridge(context: Context) {
+class SettingsBridge(private val context: Context) {
     private val preferences = context.getSharedPreferences("web_scanner_settings", Context.MODE_PRIVATE)
 
     fun handle(call: MethodCall, result: MethodChannel.Result): Boolean {
@@ -19,9 +21,27 @@ class SettingsBridge(context: Context) {
                 "captureEnabled" to preferences.getBoolean("captureEnabled", true)
             ))
             "updateSettings" -> update(call, result)
+            "openExternalUrl" -> openExternalUrl(call, result)
             else -> return false
         }
         return true
+    }
+
+    private fun openExternalUrl(call: MethodCall, result: MethodChannel.Result) {
+        val url = call.argument<String>("url").orEmpty().trim()
+        if (url.isBlank()) {
+            result.error("invalid_url", "URL không hợp lệ.", null)
+            return
+        }
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            result.success(null)
+        } catch (_: Exception) {
+            result.error("open_url_failed", "Không mở được liên kết.", null)
+        }
     }
 
     private fun update(call: MethodCall, result: MethodChannel.Result) {

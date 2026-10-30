@@ -374,7 +374,7 @@ class _GuideNotifyPageState extends State<GuideNotifyPage> {
                                 const SizedBox(width: 10),
                                 const Expanded(
                                   child: Text(
-                                    'Web Scanner - Dual App',
+                                    'WA Web Scanner - Dual App',
                                     style: TextStyle(
                                       fontSize: 13.5,
                                       fontWeight: FontWeight.w700,
