@@ -76,10 +76,12 @@ class _AppNativeAdState extends State<AppNativeAd> {
             rc.adsGlobalEnabled,
             if (widget.styleRx != null) widget.styleRx!,
             rc.adUnitNativeAndroid,
+            rc.adUnitNativeLangAndroid,
             rc.adUnitNativeCollabAndroid,
             rc.adUnitNativeOnboardingAndroid,
             rc.adUnitNativeFallbackAndroid,
             rc.adUnitNativeIos,
+            rc.adUnitNativeLangIos,
             rc.adUnitNativeCollabIos,
             rc.adUnitNativeOnboardingIos,
             rc.adUnitNativeFallbackIos,
@@ -141,6 +143,9 @@ class _AppNativeAdState extends State<AppNativeAd> {
   }
 
   String _resolvePrimaryAdUnitId(int style, RemoteConfigService rc) {
+    if (widget.placement == 'language_page') {
+      return rc.activeNativeLangAdUnitId;
+    }
     if (widget.placement == 'onboarding_page') {
       return rc.activeNativeOnboardingAdUnitId;
     }

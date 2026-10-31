@@ -1,55 +1,80 @@
 import 'package:flutter/foundation.dart';
 
-/// Official Google AdMob Test Ad Unit IDs for Android & iOS.
-/// Reference: https://developers.google.com/admob/android/test-ads
+/// Production & Default AdMob Ad Unit IDs for WA Web Scanner - Dual App.
 class AdTestIds {
   AdTestIds._();
 
-  /// Official Google AdMob Test App ID (declared in AndroidManifest.xml).
+  /// Official AdMob App ID (declared in AndroidManifest.xml).
   static const String androidTestAppId =
-      'ca-app-pub-3940256099942544~3347511713';
+      'ca-app-pub-8885343988640187~3074190120';
 
+  /// Open ads (Splash / Cold Start)
   static const String androidAppOpenId =
-      'ca-app-pub-3940256099942544/9257395921';
+      'ca-app-pub-8885343988640187/2738314056';
   static const String iosAppOpenId =
-      'ca-app-pub-3940256099942544/5575463023';
+      'ca-app-pub-8885343988640187/2738314056';
 
+  /// Open resume (Hot Start / App Resume)
+  static const String androidAppOpenResumeId =
+      'ca-app-pub-8885343988640187/6717921661';
+  static const String iosAppOpenResumeId =
+      'ca-app-pub-8885343988640187/6717921661';
+
+  /// Inter (Interstitial)
   static const String androidInterstitialId =
-      'ca-app-pub-3940256099942544/1033173712';
+      'ca-app-pub-8885343988640187/9344085000';
   static const String iosInterstitialId =
-      'ca-app-pub-3940256099942544/4411468910';
+      'ca-app-pub-8885343988640187/9344085000';
 
+  /// Banner (Adaptive & Collapsible)
   static const String androidAdaptiveBannerId =
-      'ca-app-pub-3940256099942544/9214589741';
+      'ca-app-pub-8885343988640187/1657166677';
   static const String iosAdaptiveBannerId =
-      'ca-app-pub-3940256099942544/2435281174';
+      'ca-app-pub-8885343988640187/1657166677';
 
   static const String androidCollapsibleBannerId =
-      'ca-app-pub-3940256099942544/2014213617';
+      'ca-app-pub-8885343988640187/1657166677';
   static const String iosCollapsibleBannerId =
-      'ca-app-pub-3940256099942544/8388050270';
+      'ca-app-pub-8885343988640187/1657166677';
 
+  /// Native (General Native: List, Exit Dialog, Onboarding, Collab)
   static const String androidNativePrimaryId =
-      '/21775744923/example/native-video';
+      'ca-app-pub-8885343988640187/3434328958';
   static const String androidNativeFallbackId =
-      '/21775744923/example/native';
+      'ca-app-pub-8885343988640187/5042924095';
+  static const String androidNativeLangId =
+      'ca-app-pub-8885343988640187/5042924095';
   static const String androidNativeCollabId =
-      '/21775744923/example/native-video';
+      'ca-app-pub-8885343988640187/3434328958';
   static const String androidNativeOnboardingId =
-      '/21775744923/example/native-video';
+      'ca-app-pub-8885343988640187/3434328958';
+
   static const String iosNativePrimaryId =
-      '/21775744923/example/native-video';
+      'ca-app-pub-8885343988640187/3434328958';
   static const String iosNativeFallbackId =
-      'ca-app-pub-3940256099942544/3986624511';
+      'ca-app-pub-8885343988640187/5042924095';
+  static const String iosNativeLangId =
+      'ca-app-pub-8885343988640187/5042924095';
   static const String iosNativeCollabId =
-      '/21775744923/example/native-video';
+      'ca-app-pub-8885343988640187/3434328958';
   static const String iosNativeOnboardingId =
-      '/21775744923/example/native-video';
+      'ca-app-pub-8885343988640187/3434328958';
+
+  /// Reward
+  static const String androidRewardId =
+      'ca-app-pub-8885343988640187/1826180926';
+  static const String iosRewardId =
+      'ca-app-pub-8885343988640187/1826180926';
 
   static String get appOpenAdUnitId =>
       defaultTargetPlatform == TargetPlatform.iOS
           ? iosAppOpenId
           : androidAppOpenId;
+
+  static String get appOpenResumeAdUnitId =>
+      defaultTargetPlatform == TargetPlatform.iOS
+          ? iosAppOpenResumeId
+          : androidAppOpenResumeId;
 
   static String get interstitialAdUnitId =>
       defaultTargetPlatform == TargetPlatform.iOS

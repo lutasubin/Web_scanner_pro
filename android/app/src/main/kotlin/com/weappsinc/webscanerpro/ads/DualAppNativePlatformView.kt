@@ -70,14 +70,14 @@ object DualAppNativeAdManager {
     private val cacheQueue = ArrayList<CachedNativeAd>()
     private val pendingConsumers = CopyOnWriteArrayList<PendingRequest>()
     private var inFlightLoads = 0
-    private var primaryAdUnitId: String = "ca-app-pub-3940256099942544/2247696110"
-    private var fallbackAdUnitId: String = "ca-app-pub-3940256099942544/1044960115"
+    private var primaryAdUnitId: String = "ca-app-pub-8885343988640187/3434328958"
+    private var fallbackAdUnitId: String = "ca-app-pub-8885343988640187/5042924095"
     private var appContext: Context? = null
 
     fun configureAndPreload(
         context: Context,
         adUnitId: String,
-        fallbackUnitId: String = "ca-app-pub-3940256099942544/1044960115",
+        fallbackUnitId: String = "ca-app-pub-8885343988640187/5042924095",
     ) {
         mainHandler.post {
             appContext = context.applicationContext

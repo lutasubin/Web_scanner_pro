@@ -1083,6 +1083,6 @@ class WebSessionActivity : ComponentActivity() {
 
     companion object {
         private const val FILE_CHOOSER_LOG = "WebFileChooser"
-        private const val TEST_BANNER_AD_UNIT_ID = "ca-app-pub-3940256099942544/2014213617"
+        private const val TEST_BANNER_AD_UNIT_ID = "ca-app-pub-8885343988640187/1657166677"
     }
 }

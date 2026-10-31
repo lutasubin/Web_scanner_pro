@@ -212,6 +212,11 @@ class _AdsDebugPageState extends State<AdsDebugPage> {
           ),
           _buildAdUnitRow(
             context,
+            rcKey: 'ad_unit_app_open_resume_android',
+            rx: _rc.adUnitAppOpenResumeAndroid,
+          ),
+          _buildAdUnitRow(
+            context,
             rcKey: 'ad_unit_interstitial_android',
             rx: _rc.adUnitInterstitialAndroid,
           ),
@@ -232,6 +237,11 @@ class _AdsDebugPageState extends State<AdsDebugPage> {
           ),
           _buildAdUnitRow(
             context,
+            rcKey: 'ad_unit_native_lang_android',
+            rx: _rc.adUnitNativeLangAndroid,
+          ),
+          _buildAdUnitRow(
+            context,
             rcKey: 'ad_unit_native_onboarding_android',
             rx: _rc.adUnitNativeOnboardingAndroid,
           ),
@@ -244,6 +254,11 @@ class _AdsDebugPageState extends State<AdsDebugPage> {
             context,
             rcKey: 'ad_unit_native_fallback_android',
             rx: _rc.adUnitNativeFallbackAndroid,
+          ),
+          _buildAdUnitRow(
+            context,
+            rcKey: 'ad_unit_reward_android',
+            rx: _rc.adUnitRewardAndroid,
           ),
         ],
       ),

@@ -62,6 +62,8 @@ class RemoteConfigService {
   // Remote-Configurable Ad Unit IDs (Android & iOS)
   final adUnitAppOpenAndroid = AdTestIds.androidAppOpenId.obs;
   final adUnitAppOpenIos = AdTestIds.iosAppOpenId.obs;
+  final adUnitAppOpenResumeAndroid = AdTestIds.androidAppOpenResumeId.obs;
+  final adUnitAppOpenResumeIos = AdTestIds.iosAppOpenResumeId.obs;
   final adUnitInterstitialAndroid = AdTestIds.androidInterstitialId.obs;
   final adUnitInterstitialIos = AdTestIds.iosInterstitialId.obs;
   final adUnitBannerAndroid = AdTestIds.androidAdaptiveBannerId.obs;
@@ -69,19 +71,31 @@ class RemoteConfigService {
   final adUnitBannerCollapsibleAndroid = AdTestIds.androidCollapsibleBannerId.obs;
   final adUnitBannerCollapsibleIos = AdTestIds.iosCollapsibleBannerId.obs;
   final adUnitNativeAndroid = AdTestIds.androidNativePrimaryId.obs;
+  final adUnitNativeLangAndroid = AdTestIds.androidNativeLangId.obs;
   final adUnitNativeFallbackAndroid = AdTestIds.androidNativeFallbackId.obs;
   final adUnitNativeIos = AdTestIds.iosNativePrimaryId.obs;
+  final adUnitNativeLangIos = AdTestIds.iosNativeLangId.obs;
   final adUnitNativeFallbackIos = AdTestIds.iosNativeFallbackId.obs;
   final adUnitNativeCollabAndroid = AdTestIds.androidNativeCollabId.obs;
   final adUnitNativeCollabIos = AdTestIds.iosNativeCollabId.obs;
   final adUnitNativeOnboardingAndroid = AdTestIds.androidNativeOnboardingId.obs;
   final adUnitNativeOnboardingIos = AdTestIds.iosNativeOnboardingId.obs;
+  final adUnitRewardAndroid = AdTestIds.androidRewardId.obs;
+  final adUnitRewardIos = AdTestIds.iosRewardId.obs;
 
   String get activeAppOpenAdUnitId =>
       (defaultTargetPlatform == TargetPlatform.iOS
               ? adUnitAppOpenIos.value
               : adUnitAppOpenAndroid.value)
           .trim();
+
+  String get activeAppOpenResumeAdUnitId {
+    final resumeId = (defaultTargetPlatform == TargetPlatform.iOS
+            ? adUnitAppOpenResumeIos.value
+            : adUnitAppOpenResumeAndroid.value)
+        .trim();
+    return resumeId.isNotEmpty ? resumeId : activeAppOpenAdUnitId;
+  }
 
   String get activeInterstitialAdUnitId =>
       (defaultTargetPlatform == TargetPlatform.iOS
@@ -107,6 +121,14 @@ class RemoteConfigService {
               : adUnitNativeAndroid.value)
           .trim();
 
+  String get activeNativeLangAdUnitId {
+    final langId = (defaultTargetPlatform == TargetPlatform.iOS
+            ? adUnitNativeLangIos.value
+            : adUnitNativeLangAndroid.value)
+        .trim();
+    return langId.isNotEmpty ? langId : activeNativeAdUnitId;
+  }
+
   String get activeNativeFallbackAdUnitId =>
       (defaultTargetPlatform == TargetPlatform.iOS
               ? adUnitNativeFallbackIos.value
@@ -125,6 +147,12 @@ class RemoteConfigService {
       (defaultTargetPlatform == TargetPlatform.iOS
               ? adUnitNativeOnboardingIos.value
               : adUnitNativeOnboardingAndroid.value)
+          .trim();
+
+  String get activeRewardAdUnitId =>
+      (defaultTargetPlatform == TargetPlatform.iOS
+              ? adUnitRewardIos.value
+              : adUnitRewardAndroid.value)
           .trim();
 
   static const Map<String, dynamic> defaultParameters = <String, dynamic>{
@@ -170,6 +198,8 @@ class RemoteConfigService {
     'banner_direct_chat_enabled': true,
     'ad_unit_app_open_android': AdTestIds.androidAppOpenId,
     'ad_unit_app_open_ios': AdTestIds.iosAppOpenId,
+    'ad_unit_app_open_resume_android': AdTestIds.androidAppOpenResumeId,
+    'ad_unit_app_open_resume_ios': AdTestIds.iosAppOpenResumeId,
     'ad_unit_interstitial_android': AdTestIds.androidInterstitialId,
     'ad_unit_interstitial_ios': AdTestIds.iosInterstitialId,
     'ad_unit_banner_android': AdTestIds.androidAdaptiveBannerId,
@@ -177,13 +207,17 @@ class RemoteConfigService {
     'ad_unit_banner_collapsible_android': AdTestIds.androidCollapsibleBannerId,
     'ad_unit_banner_collapsible_ios': AdTestIds.iosCollapsibleBannerId,
     'ad_unit_native_android': AdTestIds.androidNativePrimaryId,
+    'ad_unit_native_lang_android': AdTestIds.androidNativeLangId,
     'ad_unit_native_fallback_android': AdTestIds.androidNativeFallbackId,
     'ad_unit_native_ios': AdTestIds.iosNativePrimaryId,
+    'ad_unit_native_lang_ios': AdTestIds.iosNativeLangId,
     'ad_unit_native_fallback_ios': AdTestIds.iosNativeFallbackId,
     'ad_unit_native_collab_android': AdTestIds.androidNativeCollabId,
     'ad_unit_native_collab_ios': AdTestIds.iosNativeCollabId,
     'ad_unit_native_onboarding_android': AdTestIds.androidNativeOnboardingId,
     'ad_unit_native_onboarding_ios': AdTestIds.iosNativeOnboardingId,
+    'ad_unit_reward_android': AdTestIds.androidRewardId,
+    'ad_unit_reward_ios': AdTestIds.iosRewardId,
   };
 
   Future<void> init() async {
@@ -323,6 +357,10 @@ class RemoteConfigService {
 
     adUnitAppOpenAndroid.value = rc.getString('ad_unit_app_open_android').trim();
     adUnitAppOpenIos.value = rc.getString('ad_unit_app_open_ios').trim();
+    adUnitAppOpenResumeAndroid.value =
+        rc.getString('ad_unit_app_open_resume_android').trim();
+    adUnitAppOpenResumeIos.value =
+        rc.getString('ad_unit_app_open_resume_ios').trim();
     adUnitInterstitialAndroid.value =
         rc.getString('ad_unit_interstitial_android').trim();
     adUnitInterstitialIos.value =
@@ -334,9 +372,13 @@ class RemoteConfigService {
     adUnitBannerCollapsibleIos.value =
         rc.getString('ad_unit_banner_collapsible_ios').trim();
     adUnitNativeAndroid.value = rc.getString('ad_unit_native_android').trim();
+    adUnitNativeLangAndroid.value =
+        rc.getString('ad_unit_native_lang_android').trim();
     adUnitNativeFallbackAndroid.value =
         rc.getString('ad_unit_native_fallback_android').trim();
     adUnitNativeIos.value = rc.getString('ad_unit_native_ios').trim();
+    adUnitNativeLangIos.value =
+        rc.getString('ad_unit_native_lang_ios').trim();
     adUnitNativeFallbackIos.value =
         rc.getString('ad_unit_native_fallback_ios').trim();
     adUnitNativeCollabAndroid.value =
@@ -347,6 +389,8 @@ class RemoteConfigService {
         rc.getString('ad_unit_native_onboarding_android').trim();
     adUnitNativeOnboardingIos.value =
         rc.getString('ad_unit_native_onboarding_ios').trim();
+    adUnitRewardAndroid.value = rc.getString('ad_unit_reward_android').trim();
+    adUnitRewardIos.value = rc.getString('ad_unit_reward_ios').trim();
   }
 
   int _readStyleOrLegacy(

@@ -275,114 +275,156 @@
     },
     "ad_unit_app_open_android": {
       "defaultValue": {
-        "value": "ca-app-pub-3940256099942544/9257395921"
+        "value": "ca-app-pub-8885343988640187/2738314056"
       },
-      "description": "Ad Unit ID cho App Open Ad trên Android (để trống nếu muốn tắt)",
+      "description": "Ad Unit ID cho App Open Ad lúc mở app (Open ads - Splash / Cold Start) trên Android",
       "valueType": "STRING"
     },
     "ad_unit_app_open_ios": {
       "defaultValue": {
-        "value": "ca-app-pub-3940256099942544/5575463023"
+        "value": "ca-app-pub-8885343988640187/2738314056"
       },
       "description": "Ad Unit ID cho App Open Ad trên iOS",
       "valueType": "STRING"
     },
+    "ad_unit_app_open_resume_android": {
+      "defaultValue": {
+        "value": "ca-app-pub-8885343988640187/6717921661"
+      },
+      "description": "Ad Unit ID cho App Open Ad khi quay lại app từ nền (Open resume - Hot Start) trên Android",
+      "valueType": "STRING"
+    },
+    "ad_unit_app_open_resume_ios": {
+      "defaultValue": {
+        "value": "ca-app-pub-8885343988640187/6717921661"
+      },
+      "description": "Ad Unit ID cho App Open Ad Resume trên iOS",
+      "valueType": "STRING"
+    },
     "ad_unit_interstitial_android": {
       "defaultValue": {
-        "value": "ca-app-pub-3940256099942544/1033173712"
+        "value": "ca-app-pub-8885343988640187/9344085000"
       },
-      "description": "Ad Unit ID cho Interstitial Ad trên Android (để trống nếu muốn tắt)",
+      "description": "Ad Unit ID cho Interstitial Ad (Inter) trên Android (để trống nếu muốn tắt)",
       "valueType": "STRING"
     },
     "ad_unit_interstitial_ios": {
       "defaultValue": {
-        "value": "ca-app-pub-3940256099942544/4411468910"
+        "value": "ca-app-pub-8885343988640187/9344085000"
       },
       "description": "Ad Unit ID cho Interstitial Ad trên iOS",
       "valueType": "STRING"
     },
     "ad_unit_banner_android": {
       "defaultValue": {
-        "value": "ca-app-pub-3940256099942544/9214589741"
+        "value": "ca-app-pub-8885343988640187/1657166677"
       },
       "description": "Ad Unit ID cho Adaptive Banner trên Android (Home, Web, Status, History, Files, DirectChat)",
       "valueType": "STRING"
     },
     "ad_unit_banner_ios": {
       "defaultValue": {
-        "value": "ca-app-pub-3940256099942544/2435281174"
+        "value": "ca-app-pub-8885343988640187/1657166677"
       },
       "description": "Ad Unit ID cho Adaptive Banner trên iOS",
       "valueType": "STRING"
     },
     "ad_unit_banner_collapsible_android": {
       "defaultValue": {
-        "value": "ca-app-pub-3940256099942544/2014213617"
+        "value": "ca-app-pub-8885343988640187/1657166677"
       },
       "description": "Ad Unit ID cho Collapsible Banner trên Android",
       "valueType": "STRING"
     },
     "ad_unit_banner_collapsible_ios": {
       "defaultValue": {
-        "value": "ca-app-pub-3940256099942544/8388050270"
+        "value": "ca-app-pub-8885343988640187/1657166677"
       },
       "description": "Ad Unit ID cho Collapsible Banner trên iOS",
       "valueType": "STRING"
     },
     "ad_unit_native_android": {
       "defaultValue": {
-        "value": "/21775744923/example/native-video"
+        "value": "ca-app-pub-8885343988640187/3434328958"
       },
-      "description": "Ad Unit ID chính cho Native Ad trên Android (Language, List index=1, Exit Dialog). Có thể đổi sang ca-app-pub-xxx/yyy bất kỳ lúc nào",
+      "description": "Ad Unit ID chính cho Native Ad trên Android (List index=1, Exit Dialog, Onboarding, Collab)",
+      "valueType": "STRING"
+    },
+    "ad_unit_native_lang_android": {
+      "defaultValue": {
+        "value": "ca-app-pub-8885343988640187/5042924095"
+      },
+      "description": "Ad Unit ID riêng cho Native Ad ở màn Chọn Ngôn Ngữ (Native language) trên Android",
       "valueType": "STRING"
     },
     "ad_unit_native_fallback_android": {
       "defaultValue": {
-        "value": "/21775744923/example/native"
+        "value": "ca-app-pub-8885343988640187/5042924095"
       },
       "description": "Ad Unit ID dự phòng (fallback) cho Native Ad trên Android khi mã chính không fill",
       "valueType": "STRING"
     },
     "ad_unit_native_ios": {
       "defaultValue": {
-        "value": "/21775744923/example/native-video"
+        "value": "ca-app-pub-8885343988640187/3434328958"
       },
       "description": "Ad Unit ID chính cho Native Ad trên iOS",
       "valueType": "STRING"
     },
+    "ad_unit_native_lang_ios": {
+      "defaultValue": {
+        "value": "ca-app-pub-8885343988640187/5042924095"
+      },
+      "description": "Ad Unit ID riêng cho Native Ad ở màn Chọn Ngôn Ngữ trên iOS",
+      "valueType": "STRING"
+    },
     "ad_unit_native_fallback_ios": {
       "defaultValue": {
-        "value": "ca-app-pub-3940256099942544/3986624511"
+        "value": "ca-app-pub-8885343988640187/5042924095"
       },
       "description": "Ad Unit ID dự phòng (fallback) cho Native Ad trên iOS",
       "valueType": "STRING"
     },
     "ad_unit_native_collab_android": {
       "defaultValue": {
-        "value": "/21775744923/example/native-video"
+        "value": "ca-app-pub-8885343988640187/3434328958"
       },
       "description": "Ad Unit ID riêng cho Native Collab (Style 6 - Thu gọn/Mở rộng) trên Android. Để trống sẽ dùng ad_unit_native_android",
       "valueType": "STRING"
     },
     "ad_unit_native_collab_ios": {
       "defaultValue": {
-        "value": "/21775744923/example/native-video"
+        "value": "ca-app-pub-8885343988640187/3434328958"
       },
       "description": "Ad Unit ID riêng cho Native Collab (Style 6 - Thu gọn/Mở rộng) trên iOS",
       "valueType": "STRING"
     },
     "ad_unit_native_onboarding_android": {
       "defaultValue": {
-        "value": "/21775744923/example/native-video"
+        "value": "ca-app-pub-8885343988640187/3434328958"
       },
-      "description": "Ad Unit ID riêng cho Native Ad ở màn Onboarding 3 trên Android (thay ID thật trên Firebase Remote Config)",
+      "description": "Ad Unit ID riêng cho Native Ad ở màn Onboarding 3 trên Android",
       "valueType": "STRING"
     },
     "ad_unit_native_onboarding_ios": {
       "defaultValue": {
-        "value": "/21775744923/example/native-video"
+        "value": "ca-app-pub-8885343988640187/3434328958"
       },
       "description": "Ad Unit ID riêng cho Native Ad ở màn Onboarding 3 trên iOS",
+      "valueType": "STRING"
+    },
+    "ad_unit_reward_android": {
+      "defaultValue": {
+        "value": "ca-app-pub-8885343988640187/1826180926"
+      },
+      "description": "Ad Unit ID cho Reward Ad trên Android",
+      "valueType": "STRING"
+    },
+    "ad_unit_reward_ios": {
+      "defaultValue": {
+        "value": "ca-app-pub-8885343988640187/1826180926"
+      },
+      "description": "Ad Unit ID cho Reward Ad trên iOS",
       "valueType": "STRING"
     }
   }

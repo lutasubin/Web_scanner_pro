@@ -185,13 +185,17 @@ class AdService with WidgetsBindingObserver {
       [
         rc.adUnitAppOpenAndroid,
         rc.adUnitAppOpenIos,
+        rc.adUnitAppOpenResumeAndroid,
+        rc.adUnitAppOpenResumeIos,
         rc.adUnitInterstitialAndroid,
         rc.adUnitInterstitialIos,
         rc.adUnitNativeAndroid,
+        rc.adUnitNativeLangAndroid,
         rc.adUnitNativeCollabAndroid,
         rc.adUnitNativeOnboardingAndroid,
         rc.adUnitNativeFallbackAndroid,
         rc.adUnitNativeIos,
+        rc.adUnitNativeLangIos,
         rc.adUnitNativeCollabIos,
         rc.adUnitNativeOnboardingIos,
         rc.adUnitNativeFallbackIos,
@@ -236,10 +240,12 @@ class AdService with WidgetsBindingObserver {
     );
   }
 
-  void preloadAppOpen() {
+  void preloadAppOpen({bool forResume = false}) {
     if (!isSupportedPlatform || !rc.adsGlobalEnabled.value) return;
     if (_isLoadingAppOpen || _isAppOpenValid) return;
-    final adUnitId = rc.activeAppOpenAdUnitId;
+    final adUnitId = (forResume || !inSplash.value)
+        ? rc.activeAppOpenResumeAdUnitId
+        : rc.activeAppOpenAdUnitId;
     if (adUnitId.isEmpty) {
       _log('AppOpenAd skipped (ad_unit_app_open is empty in Remote Config).');
       return;
