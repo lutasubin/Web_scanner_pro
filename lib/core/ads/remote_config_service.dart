@@ -14,13 +14,14 @@ class RemoteConfigService {
 
   FirebaseRemoteConfig? _remoteConfig;
   StreamSubscription<RemoteConfigUpdate>? _configUpdateSub;
+  Completer<void>? _initialFetchCompleter;
 
   final isInitialized = false.obs;
   final lastFetchStatus = 'not_fetched'.obs;
   final lastFetchTime = Rxn<DateTime>();
 
   // Global & Cooldown Controls
-  final adsGlobalEnabled = true.obs;
+  final adsGlobalEnabled = false.obs;
   final useWaterfallMode = false.obs;
   final splashAdStyle = 1.obs; // 0 = Off, 1 = App Open, 2 = Interstitial
   final hotOpenAdEnabled = true.obs;
@@ -156,8 +157,8 @@ class RemoteConfigService {
           .trim();
 
   static const Map<String, dynamic> defaultParameters = <String, dynamic>{
-    'ads_global_enabled': true,
-    'unShowAd': false,
+    'ads_global_enabled': false,
+    'unShowAd': true,
     'wf_mode': false,
     'splash_ad_style': 1,
     'splash_style': 1,
@@ -221,6 +222,7 @@ class RemoteConfigService {
   };
 
   Future<void> init() async {
+    _initialFetchCompleter ??= Completer<void>();
     try {
       final rc = FirebaseRemoteConfig.instance;
       _remoteConfig = rc;
@@ -237,7 +239,13 @@ class RemoteConfigService {
       isInitialized.value = true;
 
       // Fetch and activate in background without blocking startup
-      unawaited(fetchAndActivate());
+      unawaited(
+        fetchAndActivate().whenComplete(() {
+          if (!(_initialFetchCompleter?.isCompleted ?? true)) {
+            _initialFetchCompleter?.complete();
+          }
+        }),
+      );
 
       // Listen for real-time Remote Config pushes from Firebase Console / CLI
       _configUpdateSub?.cancel();
@@ -252,7 +260,19 @@ class RemoteConfigService {
     } catch (e) {
       // Safe fallback when running in widget tests or offline
       lastFetchStatus.value = 'local_defaults';
+      if (!(_initialFetchCompleter?.isCompleted ?? true)) {
+        _initialFetchCompleter?.complete();
+      }
     }
+  }
+
+  /// Waits briefly for the first Firebase Remote Config fetch to complete on cold start.
+  Future<void> ensureInitialFetch({
+    Duration timeout = const Duration(milliseconds: 2000),
+  }) async {
+    final completer = _initialFetchCompleter;
+    if (completer == null || completer.isCompleted) return;
+    await completer.future.timeout(timeout, onTimeout: () {});
   }
 
   Future<bool> fetchAndActivate() async {

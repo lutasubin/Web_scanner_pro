@@ -23,7 +23,7 @@ void main() {
 
   test('RemoteConfigService initializes with expected default flags & styles', () {
     final rc = services<RemoteConfigService>();
-    expect(rc.adsGlobalEnabled.value, isTrue);
+    expect(rc.adsGlobalEnabled.value, isFalse);
     expect(rc.splashAdStyle.value, 1);
     expect(rc.hotOpenAdEnabled.value, isTrue);
     expect(rc.hotOpenIntervalSec.value, 10);

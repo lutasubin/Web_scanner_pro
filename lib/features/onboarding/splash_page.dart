@@ -5,6 +5,7 @@ import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:get/get.dart';
 
 import '../../core/ads/ad_service.dart';
+import '../../core/ads/remote_config_service.dart';
 import '../../core/analytics/analytics_service.dart';
 import '../../core/di/di.dart';
 import '../../core/platform/app_platform.dart';
@@ -110,6 +111,9 @@ class _SplashPageState extends State<SplashPage>
     } catch (_) {}
 
     final onboardingDone = prefs.value.value.onboardingDone;
+    if (services.isRegistered<RemoteConfigService>()) {
+      await services<RemoteConfigService>().ensureInitialFetch();
+    }
     if (services.isRegistered<AdService>()) {
       final adService = services<AdService>();
       await adService.showColdStartAd();

@@ -183,6 +183,13 @@ class AdService with WidgetsBindingObserver {
     _adUnitChangeWorker?.dispose();
     _adUnitChangeWorker = everAll(
       [
+        rc.adsGlobalEnabled,
+        rc.splashAdStyle,
+        rc.nativeLangStyle,
+        rc.nativeOnboardingStyle,
+        rc.nativeHomeCollabStyle,
+        rc.nativeListStyle,
+        rc.nativeExitStyle,
         rc.adUnitAppOpenAndroid,
         rc.adUnitAppOpenIos,
         rc.adUnitAppOpenResumeAndroid,
