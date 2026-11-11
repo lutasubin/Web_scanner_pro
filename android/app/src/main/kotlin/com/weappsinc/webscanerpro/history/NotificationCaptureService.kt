@@ -4,20 +4,9 @@ import android.content.ComponentName
 import android.content.Context
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
-import com.weappsinc.webscanerpro.media.StatusMonitorService
 import com.weappsinc.webscanerpro.media.StatusNotificationHelper
 
 class NotificationCaptureService : NotificationListenerService() {
-    override fun onCreate() {
-        super.onCreate()
-        StatusMonitorService.ensureRunning(this)
-    }
-
-    override fun onListenerConnected() {
-        super.onListenerConnected()
-        StatusMonitorService.ensureRunning(this)
-    }
-
     override fun onListenerDisconnected() {
         super.onListenerDisconnected()
         runCatching {
@@ -26,7 +15,6 @@ class NotificationCaptureService : NotificationListenerService() {
     }
 
     override fun onNotificationPosted(notification: StatusBarNotification) {
-        StatusMonitorService.ensureRunning(this)
         if (notification.packageName !in setOf("com.whatsapp", "com.whatsapp.w4b")) return
         val settings = getSharedPreferences("web_scanner_settings", Context.MODE_PRIVATE)
         if (!settings.getBoolean("captureEnabled", true)) return
