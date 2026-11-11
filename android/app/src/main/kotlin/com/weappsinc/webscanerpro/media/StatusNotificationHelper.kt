@@ -1,7 +1,6 @@
 package com.weappsinc.webscanerpro.media
 
 import android.Manifest
-import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -20,10 +19,7 @@ object StatusNotificationHelper {
     private const val MEDIA_CHANNEL_NAME = "New Message"
     private const val MESSAGE_CHANNEL_ID = "message"
     private const val MESSAGE_CHANNEL_NAME = "New Message"
-    private const val SERVICE_CHANNEL_ID = "service"
-    private const val SERVICE_CHANNEL_NAME = "Recover Media"
 
-    const val SERVICE_NOTIFICATION_ID = 1
     private const val STATUS_NOTIFICATION_ID = 111
     private const val MESSAGE_NOTIFICATION_ID = 1011
     private const val LEGACY_CANCEL_ID = 1012
@@ -37,38 +33,6 @@ object StatusNotificationHelper {
         } else {
             true
         }
-    }
-
-    fun buildServiceNotification(context: Context): Notification {
-        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                SERVICE_CHANNEL_ID,
-                SERVICE_CHANNEL_NAME,
-                NotificationManager.IMPORTANCE_LOW,
-            ).apply {
-                setSound(null, null)
-                enableVibration(false)
-                setShowBadge(false)
-            }
-            manager.createNotificationChannel(channel)
-        }
-
-        val intent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
-        }
-        val pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT or
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) PendingIntent.FLAG_IMMUTABLE else 0
-        val pendingIntent = PendingIntent.getActivity(context, 100, intent, pendingFlags)
-
-        return NotificationCompat.Builder(context, SERVICE_CHANNEL_ID)
-            .setContentTitle(context.getString(R.string.app_name))
-            .setSmallIcon(R.drawable.ic_notification_origin)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setOngoing(true)
-            .setSilent(true)
-            .setContentIntent(pendingIntent)
-            .build()
     }
 
     fun notifyNewStatus(context: Context) {

@@ -1,16 +1,11 @@
 package com.weappsinc.webscanerpro.media
 
-import android.app.Service
 import android.content.Context
-import android.content.Intent
-import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.Environment
 import android.os.FileObserver
 import android.os.Handler
-import android.os.IBinder
 import android.os.Looper
-import androidx.core.content.ContextCompat
 import java.io.File
 import java.util.Collections
 import java.util.concurrent.CopyOnWriteArraySet
@@ -18,53 +13,43 @@ import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 
-class StatusMonitorService : Service() {
+object StatusMonitorService {
     private val observers = mutableListOf<FileObserver>()
     private var poller: ScheduledExecutorService? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val listeners = CopyOnWriteArraySet<() -> Unit>()
+    private val seenStatusNames: MutableSet<String> =
+        Collections.synchronizedSet(HashSet<String>())
+    private val seenWaMediaNames: MutableSet<String> =
+        Collections.synchronizedSet(HashSet<String>())
+    @Volatile
+    private var initialSnapshotReady = false
+    @Volatile
+    private var lastNotificationAtMs = 0L
 
-    override fun onBind(intent: Intent?): IBinder? = null
-
-    override fun onCreate() {
-        super.onCreate()
-        startForegroundSafely()
-        startWatching()
+    fun addListener(listener: () -> Unit) {
+        listeners.add(listener)
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        startForegroundSafely()
-        if (intent?.action == ACTION_REFRESH_WATCHERS) {
-            restartWatching()
-        }
-        return START_STICKY
+    fun removeListener(listener: () -> Unit) {
+        listeners.remove(listener)
     }
 
-    override fun onDestroy() {
-        stopWatching()
-        super.onDestroy()
-    }
-
-    private fun startForegroundSafely() {
-        runCatching {
-            val notification = StatusNotificationHelper.buildServiceNotification(this)
-            if (Build.VERSION.SDK_INT >= 34) {
-                startForeground(
-                    StatusNotificationHelper.SERVICE_NOTIFICATION_ID,
-                    notification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC,
-                )
-            } else {
-                startForeground(StatusNotificationHelper.SERVICE_NOTIFICATION_ID, notification)
+    @Synchronized
+    fun ensureRunning(context: Context, refreshWatchers: Boolean = false) {
+        val appContext = context.applicationContext
+        val activePoller = poller
+        if (refreshWatchers || activePoller == null || activePoller.isShutdown) {
+            stopWatching()
+            startWatching(appContext)
+        } else {
+            activePoller.execute {
+                runCatching { pollForChanges(appContext) }
             }
         }
     }
 
-    private fun restartWatching() {
-        stopWatching()
-        startWatching()
-    }
-
-    private fun startWatching() {
-        val appContext = applicationContext
+    private fun startWatching(appContext: Context) {
         val executor = Executors.newSingleThreadScheduledExecutor()
         poller = executor
         executor.execute {
@@ -105,6 +90,7 @@ class StatusMonitorService : Service() {
         )
     }
 
+    @Synchronized
     private fun stopWatching() {
         synchronized(observers) {
             for (observer in observers) {
@@ -207,100 +193,64 @@ class StatusMonitorService : Service() {
         }
     }
 
-    companion object {
-        private const val ACTION_REFRESH_WATCHERS = "com.weappsinc.webscanerpro.REFRESH_STATUS_WATCHERS"
-        private val mainHandler = Handler(Looper.getMainLooper())
-        private val listeners = CopyOnWriteArraySet<() -> Unit>()
-        private val seenStatusNames: MutableSet<String> =
-            Collections.synchronizedSet(HashSet<String>())
-        private val seenWaMediaNames: MutableSet<String> =
-            Collections.synchronizedSet(HashSet<String>())
-        @Volatile
-        private var initialSnapshotReady = false
-        @Volatile
-        private var lastNotificationAtMs = 0L
-
-        fun addListener(listener: () -> Unit) {
-            listeners.add(listener)
-        }
-
-        fun removeListener(listener: () -> Unit) {
-            listeners.remove(listener)
-        }
-
-        fun ensureRunning(context: Context, refreshWatchers: Boolean = false) {
-            val appContext = context.applicationContext
-            val intent = Intent(appContext, StatusMonitorService::class.java).apply {
-                if (refreshWatchers) {
-                    action = ACTION_REFRESH_WATCHERS
-                }
-            }
-            runCatching {
-                ContextCompat.startForegroundService(appContext, intent)
-            }.onFailure {
-                runCatching { appContext.startService(intent) }
+    fun onStatusDetected(context: Context, fileName: String, notifyUser: Boolean = true) {
+        val appContext = context.applicationContext
+        if (!isSupportedMediaName(fileName)) return
+        seedExistingStatuses(appContext)
+        val isNew = seenStatusNames.add(fileName)
+        if (isNew && notifyUser) {
+            val now = System.currentTimeMillis()
+            if (now - lastNotificationAtMs > 800L) {
+                lastNotificationAtMs = now
+                StatusNotificationHelper.notifyNewStatus(appContext)
             }
         }
+        dispatchStatusesUpdated()
+    }
 
-        fun onStatusDetected(context: Context, fileName: String, notifyUser: Boolean = true) {
-            val appContext = context.applicationContext
-            if (!isSupportedMediaName(fileName)) return
-            seedExistingStatuses(appContext)
-            val isNew = seenStatusNames.add(fileName)
-            if (isNew && notifyUser) {
-                val now = System.currentTimeMillis()
-                if (now - lastNotificationAtMs > 800L) {
-                    lastNotificationAtMs = now
-                    StatusNotificationHelper.notifyNewStatus(appContext)
-                }
-            }
-            dispatchStatusesUpdated()
-        }
-
-        private fun seedExistingStatuses(appContext: Context) {
+    private fun seedExistingStatuses(appContext: Context) {
+        if (initialSnapshotReady) return
+        synchronized(seenStatusNames) {
             if (initialSnapshotReady) return
-            synchronized(seenStatusNames) {
-                if (initialSnapshotReady) return
-                val folders = StatusFolders(appContext)
-                for (business in listOf(false, true)) {
-                    val records = runCatching { folders.list(business) }.getOrDefault(emptyList())
-                    for (record in records) {
-                        if (isSupportedMediaName(record.name)) {
-                            seenStatusNames.add(record.name)
-                        }
+            val folders = StatusFolders(appContext)
+            for (business in listOf(false, true)) {
+                val records = runCatching { folders.list(business) }.getOrDefault(emptyList())
+                for (record in records) {
+                    if (isSupportedMediaName(record.name)) {
+                        seenStatusNames.add(record.name)
                     }
                 }
-                initialSnapshotReady = true
             }
+            initialSnapshotReady = true
         }
+    }
 
-        private fun dispatchStatusesUpdated() {
-            mainHandler.post {
-                for (listener in listeners) {
-                    runCatching { listener.invoke() }
-                }
+    private fun dispatchStatusesUpdated() {
+        mainHandler.post {
+            for (listener in listeners) {
+                runCatching { listener.invoke() }
             }
-            mainHandler.postDelayed({
-                for (listener in listeners) {
-                    runCatching { listener.invoke() }
-                }
-            }, 400L)
         }
+        mainHandler.postDelayed({
+            for (listener in listeners) {
+                runCatching { listener.invoke() }
+            }
+        }, 400L)
+    }
 
-        private fun isSupportedMediaName(name: String): Boolean {
-            val lower = name.lowercase()
-            if (lower.startsWith(".") || lower.endsWith(".was") || lower.endsWith(".nomedia")) {
-                return false
-            }
-            return lower.endsWith(".jpg") ||
-                lower.endsWith(".jpeg") ||
-                lower.endsWith(".png") ||
-                lower.endsWith(".webp") ||
-                lower.endsWith(".gif") ||
-                lower.endsWith(".mp4") ||
-                lower.endsWith(".3gp") ||
-                lower.endsWith(".mkv") ||
-                lower.endsWith(".webm")
+    private fun isSupportedMediaName(name: String): Boolean {
+        val lower = name.lowercase()
+        if (lower.startsWith(".") || lower.endsWith(".was") || lower.endsWith(".nomedia")) {
+            return false
         }
+        return lower.endsWith(".jpg") ||
+            lower.endsWith(".jpeg") ||
+            lower.endsWith(".png") ||
+            lower.endsWith(".webp") ||
+            lower.endsWith(".gif") ||
+            lower.endsWith(".mp4") ||
+            lower.endsWith(".3gp") ||
+            lower.endsWith(".mkv") ||
+            lower.endsWith(".webm")
     }
 }

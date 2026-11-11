@@ -47,6 +47,7 @@ import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import com.weappsinc.webscanerpro.MainActivity
 import com.weappsinc.webscanerpro.R
+import com.weappsinc.webscanerpro.media.StatusMonitorService
 import com.google.ads.mediation.admob.AdMobAdapter
 import com.google.android.gms.ads.AdRequest
 import com.google.android.gms.ads.AdSize
@@ -1072,6 +1073,7 @@ class WebSessionActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        StatusMonitorService.ensureRunning(this)
         bannerAdView?.resume()
         webView?.onResume()
     }
