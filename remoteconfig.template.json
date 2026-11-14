@@ -2,14 +2,14 @@
   "parameters": {
     "ads_global_enabled": {
       "defaultValue": {
-        "value": "false"
+        "value": "true"
       },
       "description": "Công tắc tổng bật/tắt toàn bộ quảng cáo trên ứng dụng (tương đương !unShowAd ở app gốc)",
       "valueType": "BOOLEAN"
     },
     "unShowAd": {
       "defaultValue": {
-        "value": "true"
+        "value": "false"
       },
       "description": "[App Gốc] Công tắc ẩn quảng cáo khi duyệt phiên bản (true = tắt toàn bộ quảng cáo)",
       "valueType": "BOOLEAN"
