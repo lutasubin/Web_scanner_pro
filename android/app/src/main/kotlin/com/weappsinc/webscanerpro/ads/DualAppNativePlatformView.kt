@@ -38,7 +38,9 @@ import java.util.concurrent.CopyOnWriteArrayList
  *   at the moment `com.example.dual_app/native_ad` (`jc/h.java`) is displayed.
  */
 object DualAppNativeAdManager {
-    const val MAX_CACHE = 3
+    // Keep at most 1 cached Native Ad to maximize Show Rate and avoid wasting
+    // matched ads that are never displayed.
+    const val MAX_CACHE = 1
 
     // Exact layout array matching `jc/a.java` (`Integer[] a = {ad_native, ad_native_small, ad_native_small_hollow, ad_native_btn_top, ad_native_btn_bottom}`) + style 6 collab
     val LAYOUT_RES_IDS = intArrayOf(
@@ -69,27 +71,61 @@ object DualAppNativeAdManager {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val cacheQueue = ArrayList<CachedNativeAd>()
     private val pendingConsumers = CopyOnWriteArrayList<PendingRequest>()
-    private var inFlightLoads = 0
+    private val inFlightByUnit = HashMap<String, Int>()
     private var primaryAdUnitId: String = "ca-app-pub-8885343988640187/3434328958"
-    private var fallbackAdUnitId: String = "ca-app-pub-8885343988640187/5042924095"
+    private var fallbackAdUnitId: String = ""
     private var appContext: Context? = null
 
+    private fun totalInFlight(): Int = inFlightByUnit.values.sum()
+
+    private fun inFlightFor(unitId: String): Int = inFlightByUnit[unitId] ?: 0
+
+    private fun incInFlight(unitId: String) {
+        inFlightByUnit[unitId] = (inFlightByUnit[unitId] ?: 0) + 1
+    }
+
+    private fun decInFlight(unitId: String) {
+        val next = (inFlightByUnit[unitId] ?: 0) - 1
+        if (next <= 0) {
+            inFlightByUnit.remove(unitId)
+        } else {
+            inFlightByUnit[unitId] = next
+        }
+    }
+
+    /**
+     * Just-In-Time preload of at most 1 Native Ad for [adUnitId].
+     * Never triggers fallback unit IDs during background preloads so distinct
+     * placements (e.g. Native language) are not polluted with unshown requests.
+     */
     fun configureAndPreload(
         context: Context,
         adUnitId: String,
-        fallbackUnitId: String = "ca-app-pub-8885343988640187/5042924095",
+        fallbackUnitId: String = "",
     ) {
         mainHandler.post {
             appContext = context.applicationContext
             val trimmedPrimary = adUnitId.trim()
             val trimmedFallback = fallbackUnitId.trim()
-            if (trimmedPrimary.isNotEmpty()) {
-                primaryAdUnitId = trimmedPrimary
+            if (trimmedPrimary.isEmpty()) return@post
+            primaryAdUnitId = trimmedPrimary
+            fallbackAdUnitId = trimmedFallback
+
+            val alreadyCached = synchronized(cacheQueue) {
+                pruneExpiredLocked()
+                cacheQueue.any { it.unitId == trimmedPrimary } || cacheQueue.size >= MAX_CACHE
             }
-            if (trimmedFallback.isNotEmpty()) {
-                fallbackAdUnitId = trimmedFallback
+            if (alreadyCached || inFlightFor(trimmedPrimary) > 0) {
+                return@post
             }
-            replenishQueue()
+
+            loadSingleNativeAd(
+                context = context.applicationContext,
+                unitId = trimmedPrimary,
+                fallbackId = "",
+                isFallbackRetry = false,
+                allowFallback = false,
+            )
         }
     }
 
@@ -106,6 +142,31 @@ object DualAppNativeAdManager {
                 item.ad.destroy()
             }
             cacheQueue.clear()
+        }
+    }
+
+    /**
+     * If a PlatformView was disposed before its on-demand NativeAd finished loading,
+     * recycle the ad into the single-slot cache instead of destroying a matched ad.
+     */
+    fun returnUnusedAd(nativeAd: NativeAd, unitId: String) {
+        mainHandler.post {
+            if (pendingConsumers.isNotEmpty()) {
+                val matchIdx = pendingConsumers.indexOfFirst { it.adUnitId == unitId }
+                if (matchIdx >= 0) {
+                    val consumer = pendingConsumers.removeAt(matchIdx)
+                    consumer.onResult(nativeAd, null)
+                    return@post
+                }
+            }
+            synchronized(cacheQueue) {
+                pruneExpiredLocked()
+                if (cacheQueue.size < MAX_CACHE) {
+                    cacheQueue.add(CachedNativeAd(nativeAd, unitId))
+                } else {
+                    nativeAd.destroy()
+                }
+            }
         }
     }
 
@@ -129,7 +190,7 @@ object DualAppNativeAdManager {
         mainHandler.post {
             appContext = context.applicationContext
             val targetUnitId = requestedAdUnitId.trim().ifEmpty { primaryAdUnitId }
-            val targetFallbackId = requestedFallbackUnitId.trim().ifEmpty { fallbackAdUnitId }
+            val targetFallbackId = requestedFallbackUnitId.trim()
 
             var popped: NativeAd? = null
             synchronized(cacheQueue) {
@@ -143,8 +204,8 @@ object DualAppNativeAdManager {
             }
 
             if (popped != null) {
-                // Immediately trigger background replenish (`xf/b.java:600-601` -> `eVar.k(fm.k.f)`)
-                replenishQueue()
+                // Do NOT blindly replenish in the background after popping:
+                // the next screen will request on-demand or JIT-preload only if needed.
                 onResult(popped, null)
             } else {
                 pendingConsumers.add(
@@ -154,31 +215,19 @@ object DualAppNativeAdManager {
                         onResult = onResult,
                     ),
                 )
-                loadSingleNativeAd(
-                    context = context.applicationContext,
-                    unitId = targetUnitId,
-                    fallbackId = targetFallbackId,
-                    isFallbackRetry = false,
-                )
-            }
-        }
-    }
-
-    fun replenishQueue() {
-        mainHandler.post {
-            val ctx = appContext ?: return@post
-            val currentSize = cachedCount()
-            val needed = (MAX_CACHE + pendingConsumers.size) - (currentSize + inFlightLoads)
-            if (needed <= 0 || primaryAdUnitId.isEmpty()) return@post
-
-            val toStart = needed.coerceAtMost(MAX_CACHE)
-            for (i in 0 until toStart) {
-                loadSingleNativeAd(
-                    context = ctx,
-                    unitId = primaryAdUnitId,
-                    fallbackId = fallbackAdUnitId,
-                    isFallbackRetry = false,
-                )
+                // Deduplicate against an already in-flight request for the same unit ID.
+                val pendingForUnit = pendingConsumers.count { it.adUnitId == targetUnitId }
+                if (inFlightFor(targetUnitId) < pendingForUnit) {
+                    val canFallback =
+                        targetFallbackId.isNotEmpty() && targetFallbackId != targetUnitId
+                    loadSingleNativeAd(
+                        context = context.applicationContext,
+                        unitId = targetUnitId,
+                        fallbackId = if (canFallback) targetFallbackId else "",
+                        isFallbackRetry = false,
+                        allowFallback = canFallback,
+                    )
+                }
             }
         }
     }
@@ -188,9 +237,10 @@ object DualAppNativeAdManager {
         unitId: String,
         fallbackId: String,
         isFallbackRetry: Boolean,
+        allowFallback: Boolean,
     ) {
         if (unitId.isEmpty()) return
-        inFlightLoads++
+        incInFlight(unitId)
 
         // Exact VideoOptions & NativeAdOptions from `yl/d.java:46-53`
         val videoOptions = VideoOptions.Builder()
@@ -207,30 +257,24 @@ object DualAppNativeAdManager {
             .withNativeAdOptions(nativeAdOptions)
             .forNativeAd { nativeAd ->
                 mainHandler.post {
-                    inFlightLoads = (inFlightLoads - 1).coerceAtLeast(0)
+                    decInFlight(unitId)
                     if (pendingConsumers.isNotEmpty()) {
                         val matchIdx = pendingConsumers.indexOfFirst {
                             it.adUnitId == unitId || (isFallbackRetry && it.fallbackAdUnitId == unitId)
                         }
-                        val consumer = if (matchIdx >= 0) {
-                            pendingConsumers.removeAt(matchIdx)
-                        } else {
-                            pendingConsumers.removeAt(0)
-                        }
-                        consumer.onResult(nativeAd, null)
-                    } else {
-                        synchronized(cacheQueue) {
-                            pruneExpiredLocked()
-                            if (cacheQueue.size < MAX_CACHE) {
-                                cacheQueue.add(CachedNativeAd(nativeAd, unitId))
-                            } else {
-                                nativeAd.destroy()
-                            }
+                        if (matchIdx >= 0) {
+                            val consumer = pendingConsumers.removeAt(matchIdx)
+                            consumer.onResult(nativeAd, null)
+                            return@post
                         }
                     }
-                    // Continue filling up to MAX_CACHE = 3 (`yl/e.java`)
-                    if (cachedCount() + inFlightLoads < MAX_CACHE) {
-                        replenishQueue()
+                    synchronized(cacheQueue) {
+                        pruneExpiredLocked()
+                        if (cacheQueue.size < MAX_CACHE) {
+                            cacheQueue.add(CachedNativeAd(nativeAd, unitId))
+                        } else {
+                            nativeAd.destroy()
+                        }
                     }
                 }
             }
@@ -238,17 +282,26 @@ object DualAppNativeAdManager {
                 object : AdListener() {
                     override fun onAdFailedToLoad(error: LoadAdError) {
                         mainHandler.post {
-                            inFlightLoads = (inFlightLoads - 1).coerceAtLeast(0)
-                            if (!isFallbackRetry && fallbackId.isNotEmpty() && fallbackId != unitId) {
+                            decInFlight(unitId)
+                            val hasWaitingConsumer = pendingConsumers.any {
+                                it.adUnitId == unitId || it.fallbackAdUnitId == fallbackId
+                            }
+                            if (allowFallback &&
+                                !isFallbackRetry &&
+                                hasWaitingConsumer &&
+                                fallbackId.isNotEmpty() &&
+                                fallbackId != unitId
+                            ) {
                                 loadSingleNativeAd(
                                     context = context,
                                     unitId = fallbackId,
                                     fallbackId = fallbackId,
                                     isFallbackRetry = true,
+                                    allowFallback = false,
                                 )
                                 return@post
                             }
-                            if (pendingConsumers.isNotEmpty() && inFlightLoads == 0 && cachedCount() == 0) {
+                            if (pendingConsumers.isNotEmpty() && totalInFlight() == 0 && cachedCount() == 0) {
                                 val snapshot = ArrayList(pendingConsumers)
                                 pendingConsumers.clear()
                                 for (consumer in snapshot) {
@@ -442,7 +495,9 @@ class DualAppNativePlatformView(
                 requestedFallbackUnitId = fallbackAdUnitId,
             ) { nativeAd, errorMsg ->
                 if (disposed) {
-                    nativeAd?.destroy()
+                    if (nativeAd != null) {
+                        DualAppNativeAdManager.returnUnusedAd(nativeAd, adUnitId)
+                    }
                     return@acquireNativeAd
                 }
                 if (nativeAd == null) {

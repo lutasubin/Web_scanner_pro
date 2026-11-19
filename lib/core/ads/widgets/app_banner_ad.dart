@@ -70,13 +70,10 @@ class _AppBannerAdState extends State<AppBannerAd> {
       final rc = services<RemoteConfigService>();
       _configWorker = everAll(
         [
+          rc.configRevision,
           rc.adsGlobalEnabled,
           widget.enabledFlag,
           _effectiveCollapsibleRx(rc),
-          rc.adUnitBannerAndroid,
-          rc.adUnitBannerIos,
-          rc.adUnitBannerCollapsibleAndroid,
-          rc.adUnitBannerCollapsibleIos,
         ],
         (_) {
           if (!mounted) return;

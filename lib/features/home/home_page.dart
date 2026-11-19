@@ -22,8 +22,11 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
+  static const Duration _bannerRefreshCooldown = Duration(seconds: 45);
+
   late final HomeController controller;
   int _bannerVisitCount = 0;
+  DateTime? _lastBannerRefreshAt;
 
   @override
   void initState() {
@@ -31,6 +34,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (services.isRegistered<AnalyticsService>()) {
       services<AnalyticsService>().logEvent('MainPage');
     }
+    if (services.isRegistered<AdService>()) {
+      services<AdService>().onEnteredHome();
+    }
+    _lastBannerRefreshAt = DateTime.now();
     WidgetsBinding.instance.addObserver(this);
     controller = Get.find<HomeController>();
     controller.load();
@@ -48,9 +55,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   void _bumpBannerVisit() {
-    if (mounted) {
-      setState(() => _bannerVisitCount++);
+    if (!mounted) return;
+    final now = DateTime.now();
+    final last = _lastBannerRefreshAt;
+    if (last != null && now.difference(last) < _bannerRefreshCooldown) {
+      return;
     }
+    _lastBannerRefreshAt = now;
+    setState(() => _bannerVisitCount++);
   }
 
   Future<void> _openAccounts() async {

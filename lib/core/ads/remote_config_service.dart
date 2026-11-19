@@ -14,9 +14,10 @@ class RemoteConfigService {
 
   FirebaseRemoteConfig? _remoteConfig;
   StreamSubscription<RemoteConfigUpdate>? _configUpdateSub;
-  Completer<void>? _initialFetchCompleter;
+  final Completer<void> _initialFetchCompleter = Completer<void>();
 
   final isInitialized = false.obs;
+  final configRevision = 0.obs;
   final lastFetchStatus = 'not_fetched'.obs;
   final lastFetchTime = Rxn<DateTime>();
 
@@ -222,7 +223,6 @@ class RemoteConfigService {
   };
 
   Future<void> init() async {
-    _initialFetchCompleter ??= Completer<void>();
     try {
       final rc = FirebaseRemoteConfig.instance;
       _remoteConfig = rc;
@@ -241,8 +241,8 @@ class RemoteConfigService {
       // Fetch and activate in background without blocking startup
       unawaited(
         fetchAndActivate().whenComplete(() {
-          if (!(_initialFetchCompleter?.isCompleted ?? true)) {
-            _initialFetchCompleter?.complete();
+          if (!_initialFetchCompleter.isCompleted) {
+            _initialFetchCompleter.complete();
           }
         }),
       );
@@ -260,19 +260,18 @@ class RemoteConfigService {
     } catch (e) {
       // Safe fallback when running in widget tests or offline
       lastFetchStatus.value = 'local_defaults';
-      if (!(_initialFetchCompleter?.isCompleted ?? true)) {
-        _initialFetchCompleter?.complete();
+      if (!_initialFetchCompleter.isCompleted) {
+        _initialFetchCompleter.complete();
       }
     }
   }
 
   /// Waits briefly for the first Firebase Remote Config fetch to complete on cold start.
   Future<void> ensureInitialFetch({
-    Duration timeout = const Duration(milliseconds: 2000),
+    Duration timeout = const Duration(milliseconds: 2500),
   }) async {
-    final completer = _initialFetchCompleter;
-    if (completer == null || completer.isCompleted) return;
-    await completer.future.timeout(timeout, onTimeout: () {});
+    if (Get.testMode || _initialFetchCompleter.isCompleted) return;
+    await _initialFetchCompleter.future.timeout(timeout, onTimeout: () {});
   }
 
   Future<bool> fetchAndActivate() async {
@@ -411,6 +410,10 @@ class RemoteConfigService {
         rc.getString('ad_unit_native_onboarding_ios').trim();
     adUnitRewardAndroid.value = rc.getString('ad_unit_reward_android').trim();
     adUnitRewardIos.value = rc.getString('ad_unit_reward_ios').trim();
+
+    // Emit a single consolidated revision signal after all keys finish syncing
+    // so ad listeners never suffer a reload storm from per-key Rx updates.
+    configRevision.value++;
   }
 
   int _readStyleOrLegacy(

@@ -23,6 +23,7 @@ class _SplashPageState extends State<SplashPage>
     with SingleTickerProviderStateMixin {
   late final AnimationController _progressCtrl;
   Timer? _navTimer;
+  Future<void>? _coldStartPrepFuture;
 
   @override
   void initState() {
@@ -38,7 +39,41 @@ class _SplashPageState extends State<SplashPage>
       duration: const Duration(milliseconds: 850),
     )..forward();
     _checkImmediatePendingRoute();
+    // Kick off Remote Config + Cold Start App Open Ad preload immediately in
+    // parallel with the splash animation instead of waiting 900ms first.
+    _coldStartPrepFuture = _prepareColdStartAds();
     _navTimer = Timer(const Duration(milliseconds: 900), _finishSplash);
+  }
+
+  Future<void> _prepareColdStartAds() async {
+    await Future.wait<void>([
+      () async {
+        try {
+          await services<PreferencesRepository>().ensureLoaded();
+        } catch (_) {}
+      }(),
+      if (services.isRegistered<RemoteConfigService>())
+        services<RemoteConfigService>().ensureInitialFetch(),
+      if (services.isRegistered<AdService>())
+        services<AdService>().ensureInitialized(),
+    ]);
+    if (!mounted || !services.isRegistered<AdService>()) return;
+    final adService = services<AdService>();
+    final rc = services<RemoteConfigService>();
+    if (!rc.adsGlobalEnabled.value) return;
+
+    if (rc.splashAdStyle.value == 1) {
+      adService.preloadAppOpen(forResume: false);
+    } else if (rc.splashAdStyle.value == 2) {
+      adService.preloadInterstitial();
+    }
+
+    // Just-in-time preload 1 Native Language ad ONLY for first-time users.
+    final onboardingDone =
+        services<PreferencesRepository>().value.value.onboardingDone;
+    if (!onboardingDone && rc.nativeLangStyle.value > 0) {
+      unawaited(adService.preloadLanguageNativeAd());
+    }
   }
 
   Future<void> _checkImmediatePendingRoute() async {
@@ -110,13 +145,15 @@ class _SplashPageState extends State<SplashPage>
       }
     } catch (_) {}
 
-    final onboardingDone = prefs.value.value.onboardingDone;
-    if (services.isRegistered<RemoteConfigService>()) {
-      await services<RemoteConfigService>().ensureInitialFetch();
+    if (_coldStartPrepFuture != null) {
+      await _coldStartPrepFuture;
     }
+    final onboardingDone = prefs.value.value.onboardingDone;
     if (services.isRegistered<AdService>()) {
       final adService = services<AdService>();
-      await adService.showColdStartAd();
+      await adService.showColdStartAd(
+        timeout: const Duration(milliseconds: 5500),
+      );
       adService.markLeftSplash();
     }
     if (!mounted) return;

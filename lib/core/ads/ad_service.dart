@@ -19,6 +19,7 @@ class AdService with WidgetsBindingObserver {
   final RemoteConfigService rc;
 
   final sdkInitialized = false.obs;
+  final Completer<void> _sdkInitCompleter = Completer<void>();
   final inSplash = true.obs;
   final isShowingFullScreenAd = false.obs;
   final appOpenCached = false.obs;
@@ -27,31 +28,44 @@ class AdService with WidgetsBindingObserver {
   final adEventLogs = <String>[].obs;
 
   AppOpenAd? _appOpenAd;
+  String? _loadedAppOpenUnitId;
   DateTime? _appOpenLoadTime;
   bool _isLoadingAppOpen = false;
+  int _appOpenLoadGen = 0;
   DateTime? _lastAppOpenDismissTime;
   Completer<bool>? _appOpenLoadCompleter;
 
   InterstitialAd? _interstitialAd;
+  String? _loadedInterUnitId;
   bool _isLoadingInterstitial = false;
+  int _interLoadGen = 0;
   DateTime? _lastInterDismissTime;
   Completer<bool>? _interLoadCompleter;
+  Timer? _interReplenishTimer;
 
   bool _wasInBackground = false;
   bool _returningFromWebSession = false;
   bool _suppressNextHotOpen = false;
+  bool _hasEnteredHome = false;
 
-  /// Native Ad Queue Cache (matches `nativeCache = 3` in `bm/e.java` & `yl/e.java`).
-  static const int maxNativeCachePerStyle = 3;
+  /// Just-In-Time Native Ad Cache (max 1 ad to avoid wasting unmatched/unshown preloads).
+  static const int maxNativeCachePerStyle = 1;
   final Map<int, List<NativeAd>> _nativeQueues = <int, List<NativeAd>>{};
   final Map<int, int> _nativeLoadingCount = <int, int>{};
-  Worker? _adUnitChangeWorker;
+  Worker? _configRevisionWorker;
 
   bool get isSupportedPlatform =>
       !kIsWeb &&
       (defaultTargetPlatform == TargetPlatform.android ||
           defaultTargetPlatform == TargetPlatform.iOS) &&
       !Get.testMode;
+
+  @visibleForTesting
+  bool get hasPendingInterReplenishTimer =>
+      _interReplenishTimer?.isActive ?? false;
+
+  @visibleForTesting
+  bool get hasEnteredHome => _hasEnteredHome;
 
   int get interCooldownRemainingSec {
     final last = _lastInterDismissTime;
@@ -69,36 +83,39 @@ class AdService with WidgetsBindingObserver {
     return rem > 0 ? rem : 0;
   }
 
+  Future<void> ensureInitialized({
+    Duration timeout = const Duration(milliseconds: 3500),
+  }) async {
+    if (!isSupportedPlatform || _sdkInitCompleter.isCompleted) return;
+    await _sdkInitCompleter.future.timeout(timeout, onTimeout: () {});
+  }
+
   Future<void> init() async {
     WidgetsBinding.instance.addObserver(this);
     if (!isSupportedPlatform) {
       _log('AdService initialized in non-mobile/test mode (no-op SDK).');
+      if (!_sdkInitCompleter.isCompleted) _sdkInitCompleter.complete();
       return;
     }
     try {
       await MobileAds.instance.initialize();
       sdkInitialized.value = true;
-      _log('Google Mobile Ads SDK initialized (Remote Config Ad Unit IDs).');
-      _setupAdUnitChangeListeners();
-      preloadAppOpen();
-      preloadInterstitial();
-      if (defaultTargetPlatform == TargetPlatform.android) {
-        unawaited(_preloadAndroidNativeQueue());
-      } else {
-        // Pre-warm Native Ad queues for active styles on iOS
-        final activeStyles = <int>{
-          rc.nativeLangStyle.value,
-          rc.nativeOnboardingStyle.value,
-          rc.nativeHomeCollabStyle.value,
-          rc.nativeListStyle.value,
-          rc.nativeExitStyle.value,
-        }..removeWhere((s) => s <= 0);
-        for (final style in activeStyles) {
-          replenishNativeQueue(style);
+      _log('Google Mobile Ads SDK initialized (JIT Show-Rate Optimized).');
+      _setupConfigRevisionListener();
+      // Only preload the immediate Cold Start ad on launch.
+      // Interstitials preload once the user reaches Home; Open Resume preloads
+      // on app background; Native ads preload just-in-time per screen.
+      if (inSplash.value) {
+        if (rc.splashAdStyle.value == 1) {
+          preloadAppOpen(forResume: false);
+        } else if (rc.splashAdStyle.value == 2) {
+          preloadInterstitial();
         }
       }
     } catch (e) {
       _log('MobileAds init failed: $e');
+    } finally {
+      if (!_sdkInitCompleter.isCompleted) _sdkInitCompleter.complete();
     }
   }
 
@@ -107,13 +124,17 @@ class AdService with WidgetsBindingObserver {
     final hh = now.hour.toString().padLeft(2, '0');
     final mm = now.minute.toString().padLeft(2, '0');
     final ss = now.second.toString().padLeft(2, '0');
-    adEventLogs.insert(0, '[$hh:$mm:$ss] $msg');
+    final entry = '[$hh:$mm:$ss] $msg';
+    if (kDebugMode) {
+      debugPrint('[AdService] $entry');
+    }
+    adEventLogs.insert(0, entry);
     if (adEventLogs.length > 60) {
       adEventLogs.removeLast();
     }
   }
 
-  /// Marks that the app has left the Splash screen (`leave_splash` -> `jc.b.e = false` in original app).
+  /// Marks that the app has left the Splash screen (`leave_splash`).
   void markLeftSplash() {
     if (inSplash.value) {
       inSplash.value = false;
@@ -121,12 +142,19 @@ class AdService with WidgetsBindingObserver {
     }
   }
 
+  /// Called when the user reaches `HomePage` so Interstitial preloading begins
+  /// only for active sessions that actually enter feature navigation.
+  void onEnteredHome() {
+    _hasEnteredHome = true;
+    _scheduleInterstitialReplenish();
+  }
+
   /// Call before launching an external system picker/permission screen so Hot Open Ad won't interrupt.
   void suppressNextHotOpen() {
     _suppressNextHotOpen = true;
   }
 
-  /// Marks that the user is entering `WebSessionActivity` (`jc.b.c = true` in original app).
+  /// Marks that the user is entering `WebSessionActivity`.
   void markEnteringWebSession() {
     _returningFromWebSession = true;
   }
@@ -135,10 +163,32 @@ class AdService with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
-      _wasInBackground = true;
+      if (!_wasInBackground) {
+        _wasInBackground = true;
+        _onAppPaused();
+      }
     } else if (state == AppLifecycleState.resumed && _wasInBackground) {
       _wasInBackground = false;
       _onAppResumed();
+    }
+  }
+
+  void _onAppPaused() {
+    // Never preload an Interstitial while the user has backgrounded the app.
+    _cancelInterReplenishTimer();
+
+    // Just-in-time preload for Hot Start (`Open resume`) only when the user
+    // actually backgrounds the app after leaving Splash.
+    if (!inSplash.value &&
+        rc.adsGlobalEnabled.value &&
+        rc.hotOpenAdEnabled.value &&
+        !_suppressNextHotOpen &&
+        !_returningFromWebSession &&
+        !isShowingFullScreenAd.value &&
+        hotOpenCooldownRemainingSec == 0 &&
+        !_isAppOpenValid &&
+        !_isLoadingAppOpen) {
+      preloadAppOpen(forResume: true);
     }
   }
 
@@ -152,99 +202,126 @@ class AdService with WidgetsBindingObserver {
         trigger: 'web_back',
         configOn: rc.interWebBack.value,
       );
+      _scheduleInterstitialReplenish();
       return;
     }
 
     if (_suppressNextHotOpen) {
       _suppressNextHotOpen = false;
       _log('Skipped Hot Start App Open (returning from permission/picker).');
+      _scheduleInterstitialReplenish();
       return;
     }
 
     if (inSplash.value) return;
 
-    // 100ms delay matching `new Handler(Looper.getMainLooper()).postDelayed(..., 100L)` in `jc/b.java`
+    // 100ms delay for activity resume to settle
     await Future<void>.delayed(const Duration(milliseconds: 100));
     await showHotStartAppOpenAd();
+    _scheduleInterstitialReplenish();
   }
 
   // ===========================================================================
-  // 1. APP OPEN ADS (Cold Start & Hot Start)
+  // 1. REMOTE CONFIG SINGLE-SIGNAL SYNC (No Reload Storm)
+  // ===========================================================================
+
+  void _setupConfigRevisionListener() {
+    _configRevisionWorker?.dispose();
+    _configRevisionWorker = ever<int>(rc.configRevision, (_) {
+      _onRemoteConfigUpdated();
+    });
+  }
+
+  void _onRemoteConfigUpdated() {
+    if (!rc.adsGlobalEnabled.value) {
+      _log('Remote Config disabled ads -> clearing cached ads & timers.');
+      _cancelInterReplenishTimer();
+      _disposeAppOpenCache(bumpGen: true);
+      _disposeInterstitialCache(bumpGen: true);
+      _disposeAllNativeQueues();
+      return;
+    }
+
+    // 1) App Open: only invalidate if the cached ad's unit ID is no longer valid.
+    final coldUnit = rc.activeAppOpenAdUnitId;
+    final resumeUnit = rc.activeAppOpenResumeAdUnitId;
+    if (_appOpenAd != null &&
+        _loadedAppOpenUnitId != coldUnit &&
+        _loadedAppOpenUnitId != resumeUnit) {
+      _log('AppOpen Ad Unit ID changed -> invalidating cached AppOpenAd.');
+      _disposeAppOpenCache(bumpGen: true);
+    }
+    if (inSplash.value &&
+        rc.splashAdStyle.value == 1 &&
+        !_isAppOpenValid &&
+        !_isLoadingAppOpen) {
+      preloadAppOpen(forResume: false);
+    }
+
+    // 2) Interstitial: only invalidate if the Interstitial unit ID changed.
+    final interUnit = rc.activeInterstitialAdUnitId;
+    if (_interstitialAd != null && _loadedInterUnitId != interUnit) {
+      _log('Interstitial Ad Unit ID changed -> invalidating cached InterstitialAd.');
+      _disposeInterstitialCache(bumpGen: true);
+    }
+    if (inSplash.value &&
+        rc.splashAdStyle.value == 2 &&
+        _interstitialAd == null &&
+        !_isLoadingInterstitial) {
+      preloadInterstitial();
+    } else if (_hasEnteredHome) {
+      _scheduleInterstitialReplenish();
+    }
+  }
+
+  void _disposeAppOpenCache({required bool bumpGen}) {
+    if (bumpGen) {
+      _appOpenLoadGen++;
+      _isLoadingAppOpen = false;
+      if (!(_appOpenLoadCompleter?.isCompleted ?? true)) {
+        _appOpenLoadCompleter?.complete(false);
+      }
+    }
+    _appOpenAd?.dispose();
+    _appOpenAd = null;
+    _loadedAppOpenUnitId = null;
+    _appOpenLoadTime = null;
+    appOpenCached.value = false;
+  }
+
+  void _disposeInterstitialCache({required bool bumpGen}) {
+    if (bumpGen) {
+      _interLoadGen++;
+      _isLoadingInterstitial = false;
+      if (!(_interLoadCompleter?.isCompleted ?? true)) {
+        _interLoadCompleter?.complete(false);
+      }
+    }
+    _interstitialAd?.dispose();
+    _interstitialAd = null;
+    _loadedInterUnitId = null;
+    interstitialCached.value = false;
+  }
+
+  void _disposeAllNativeQueues() {
+    for (final list in _nativeQueues.values) {
+      for (final ad in list) {
+        ad.dispose();
+      }
+    }
+    _nativeQueues.clear();
+    _nativeLoadingCount.clear();
+  }
+
+  // ===========================================================================
+  // 2. APP OPEN ADS (Cold Start & Hot Start)
   // ===========================================================================
 
   bool get _isAppOpenValid {
     if (_appOpenAd == null || _appOpenLoadTime == null) return false;
-    // AdMob App Open ads expire after 4 hours (`yl/g.java`)
+    // AdMob App Open ads expire after 4 hours.
     return DateTime.now().difference(_appOpenLoadTime!) <
         const Duration(hours: 4);
-  }
-
-  void _setupAdUnitChangeListeners() {
-    _adUnitChangeWorker?.dispose();
-    _adUnitChangeWorker = everAll(
-      [
-        rc.adsGlobalEnabled,
-        rc.splashAdStyle,
-        rc.nativeLangStyle,
-        rc.nativeOnboardingStyle,
-        rc.nativeHomeCollabStyle,
-        rc.nativeListStyle,
-        rc.nativeExitStyle,
-        rc.adUnitAppOpenAndroid,
-        rc.adUnitAppOpenIos,
-        rc.adUnitAppOpenResumeAndroid,
-        rc.adUnitAppOpenResumeIos,
-        rc.adUnitInterstitialAndroid,
-        rc.adUnitInterstitialIos,
-        rc.adUnitNativeAndroid,
-        rc.adUnitNativeLangAndroid,
-        rc.adUnitNativeCollabAndroid,
-        rc.adUnitNativeOnboardingAndroid,
-        rc.adUnitNativeFallbackAndroid,
-        rc.adUnitNativeIos,
-        rc.adUnitNativeLangIos,
-        rc.adUnitNativeCollabIos,
-        rc.adUnitNativeOnboardingIos,
-        rc.adUnitNativeFallbackIos,
-      ],
-      (_) {
-        _log('Remote Config Ad Unit IDs updated -> refreshing caches...');
-        _appOpenAd?.dispose();
-        _appOpenAd = null;
-        appOpenCached.value = false;
-        _isLoadingAppOpen = false;
-
-        _interstitialAd?.dispose();
-        _interstitialAd = null;
-        interstitialCached.value = false;
-        _isLoadingInterstitial = false;
-
-        for (final list in _nativeQueues.values) {
-          for (final ad in list) {
-            ad.dispose();
-          }
-        }
-        _nativeQueues.clear();
-        _nativeLoadingCount.clear();
-
-        preloadAppOpen();
-        preloadInterstitial();
-        if (defaultTargetPlatform == TargetPlatform.android) {
-          _preloadAndroidNativeQueue();
-        } else {
-          final activeStyles = <int>{
-            rc.nativeLangStyle.value,
-            rc.nativeOnboardingStyle.value,
-            rc.nativeHomeCollabStyle.value,
-            rc.nativeListStyle.value,
-            rc.nativeExitStyle.value,
-          }..removeWhere((s) => s <= 0);
-          for (final style in activeStyles) {
-            replenishNativeQueue(style);
-          }
-        }
-      },
-    );
   }
 
   void preloadAppOpen({bool forResume = false}) {
@@ -259,14 +336,19 @@ class AdService with WidgetsBindingObserver {
     }
 
     _isLoadingAppOpen = true;
+    final gen = ++_appOpenLoadGen;
     _appOpenLoadCompleter = Completer<bool>();
-    _log('Loading AppOpenAd ($adUnitId)...');
+    _log('Loading AppOpenAd (${forResume ? "resume" : "cold"}: $adUnitId)...');
 
     AppOpenAd.load(
       adUnitId: adUnitId,
       request: const AdRequest(),
       adLoadCallback: AppOpenAdLoadCallback(
         onAdLoaded: (ad) {
+          if (gen != _appOpenLoadGen || !rc.adsGlobalEnabled.value) {
+            ad.dispose();
+            return;
+          }
           ad.onPaidEvent = (ad, valueMicros, precision, currencyCode) {
             if (services.isRegistered<AnalyticsService>()) {
               services<AnalyticsService>().logAdRevenue(
@@ -279,6 +361,7 @@ class AdService with WidgetsBindingObserver {
             }
           };
           _appOpenAd = ad;
+          _loadedAppOpenUnitId = adUnitId;
           _appOpenLoadTime = DateTime.now();
           _isLoadingAppOpen = false;
           appOpenCached.value = true;
@@ -288,7 +371,9 @@ class AdService with WidgetsBindingObserver {
           }
         },
         onAdFailedToLoad: (error) {
+          if (gen != _appOpenLoadGen) return;
           _appOpenAd = null;
+          _loadedAppOpenUnitId = null;
           _isLoadingAppOpen = false;
           appOpenCached.value = false;
           _log('AppOpenAd failed to load: ${error.message}');
@@ -300,14 +385,16 @@ class AdService with WidgetsBindingObserver {
     );
   }
 
-  /// Mirrors `showColdStartAd` in `tc/e.java:765-800`:
+  /// Shows Cold Start Ad during Splash:
   /// - `splash_ad_style == 0`: Disabled
-  /// - `splash_ad_style == 1`: App Open Ad (with 7000ms load timeout)
-  /// - `splash_ad_style == 2`: Interstitial Ad (with 7000ms load timeout)
+  /// - `splash_ad_style == 1`: App Open Ad (up to 5500ms wait)
+  /// - `splash_ad_style == 2`: Interstitial Ad (up to 5500ms wait)
   Future<void> showColdStartAd({
-    Duration timeout = const Duration(milliseconds: 2200),
+    Duration timeout = const Duration(milliseconds: 5500),
   }) async {
-    if (!isSupportedPlatform || !rc.adsGlobalEnabled.value) return;
+    if (!isSupportedPlatform) return;
+    await ensureInitialized();
+    if (!rc.adsGlobalEnabled.value) return;
     final style = rc.splashAdStyle.value;
     if (style <= 0) {
       _log('Cold Start Ad skipped (splash_ad_style = 0).');
@@ -315,32 +402,44 @@ class AdService with WidgetsBindingObserver {
     }
 
     if (style == 1) {
-      // App Open Cold Start
       if (!_isAppOpenValid) {
-        preloadAppOpen();
+        preloadAppOpen(forResume: false);
         final completer = _appOpenLoadCompleter;
         if (completer != null) {
-          _log('Waiting up to ${timeout.inMilliseconds}ms for Cold Start AppOpenAd...');
-          await completer.future.timeout(timeout, onTimeout: () {
-            _log('Cold Start AppOpenAd timed out after ${timeout.inMilliseconds}ms.');
-            return false;
-          });
+          _log(
+            'Waiting up to ${timeout.inMilliseconds}ms for Cold Start AppOpenAd...',
+          );
+          await completer.future.timeout(
+            timeout,
+            onTimeout: () {
+              _log(
+                'Cold Start AppOpenAd timed out after ${timeout.inMilliseconds}ms (kept in cache for resume if loaded).',
+              );
+              return false;
+            },
+          );
         }
       }
       if (_isAppOpenValid) {
         await _presentAppOpenAd(trigger: 'cold_start');
       }
     } else if (style == 2) {
-      // Interstitial Cold Start
       if (_interstitialAd == null) {
         preloadInterstitial();
         final completer = _interLoadCompleter;
         if (completer != null) {
-          _log('Waiting up to ${timeout.inMilliseconds}ms for Cold Start InterstitialAd...');
-          await completer.future.timeout(timeout, onTimeout: () {
-            _log('Cold Start InterstitialAd timed out after ${timeout.inMilliseconds}ms.');
-            return false;
-          });
+          _log(
+            'Waiting up to ${timeout.inMilliseconds}ms for Cold Start InterstitialAd...',
+          );
+          await completer.future.timeout(
+            timeout,
+            onTimeout: () {
+              _log(
+                'Cold Start InterstitialAd timed out after ${timeout.inMilliseconds}ms.',
+              );
+              return false;
+            },
+          );
         }
       }
       if (_interstitialAd != null) {
@@ -353,8 +452,13 @@ class AdService with WidgetsBindingObserver {
     }
   }
 
-  /// Mirrors `xf/b.java:318-341` (`hot_start` App Open Ad on resume).
-  Future<bool> showHotStartAppOpenAd({bool ignoreCooldown = false}) async {
+  /// Shows Hot Start App Open Ad on app resume.
+  /// If a resume preload triggered on `paused` is still finishing, waits briefly
+  /// (up to 1200ms) so the matched ad is actually shown instead of wasted.
+  Future<bool> showHotStartAppOpenAd({
+    bool ignoreCooldown = false,
+    Duration inFlightWait = const Duration(milliseconds: 1200),
+  }) async {
     if (!isSupportedPlatform || !rc.adsGlobalEnabled.value) return false;
     if (!rc.hotOpenAdEnabled.value) {
       _log('Hot Start AppOpenAd skipped (hot_open_ad_enabled = false).');
@@ -365,12 +469,22 @@ class AdService with WidgetsBindingObserver {
       return false;
     }
     if (!ignoreCooldown && hotOpenCooldownRemainingSec > 0) {
-      _log('Hot Start AppOpenAd in cooldown (${hotOpenCooldownRemainingSec}s left).');
+      _log(
+        'Hot Start AppOpenAd in cooldown (${hotOpenCooldownRemainingSec}s left).',
+      );
       return false;
     }
+    if (!_isAppOpenValid && _isLoadingAppOpen && _appOpenLoadCompleter != null) {
+      _log(
+        'Hot Start AppOpenAd still loading -> waiting up to ${inFlightWait.inMilliseconds}ms...',
+      );
+      await _appOpenLoadCompleter!.future.timeout(
+        inFlightWait,
+        onTimeout: () => false,
+      );
+    }
     if (!_isAppOpenValid) {
-      _log('Hot Start AppOpenAd cache empty -> preloading for next time.');
-      preloadAppOpen();
+      _log('Hot Start AppOpenAd not ready on resume -> skipped (will preload on next pause).');
       return false;
     }
     return _presentAppOpenAd(trigger: 'hot_start');
@@ -382,13 +496,14 @@ class AdService with WidgetsBindingObserver {
 
     final dismissCompleter = Completer<bool>();
     _appOpenAd = null;
+    _loadedAppOpenUnitId = null;
+    _appOpenLoadTime = null;
     appOpenCached.value = false;
     isShowingFullScreenAd.value = true;
 
     ad.fullScreenContentCallback = FullScreenContentCallback(
       onAdShowedFullScreenContent: (_) {
-        _log('AppOpenAd shown (trigger: $trigger). Replenishing cache...');
-        preloadAppOpen();
+        _log('AppOpenAd shown (trigger: $trigger).');
       },
       onAdClicked: (ad) {
         if (services.isRegistered<AnalyticsService>()) {
@@ -409,7 +524,6 @@ class AdService with WidgetsBindingObserver {
         ad.dispose();
         isShowingFullScreenAd.value = false;
         _log('AppOpenAd failed to show ($trigger): ${error.message}');
-        preloadAppOpen();
         if (!dismissCompleter.isCompleted) dismissCompleter.complete(false);
       },
     );
@@ -425,8 +539,41 @@ class AdService with WidgetsBindingObserver {
   }
 
   // ===========================================================================
-  // 2. INTERSTITIAL ADS (`into` & `back` triggers with `inter_interval_sec`)
+  // 3. INTERSTITIAL ADS (Home-Armed + Cooldown-Aware Delayed Preload)
   // ===========================================================================
+
+  void _cancelInterReplenishTimer() {
+    _interReplenishTimer?.cancel();
+    _interReplenishTimer = null;
+  }
+
+  /// Schedules the next Interstitial preload 5 seconds before cooldown expires,
+  /// avoiding wasted loads if the user leaves the app during cooldown.
+  void _scheduleInterstitialReplenish() {
+    _cancelInterReplenishTimer();
+    if (!rc.adsGlobalEnabled.value ||
+        !_hasEnteredHome ||
+        _wasInBackground ||
+        _interstitialAd != null ||
+        _isLoadingInterstitial) {
+      return;
+    }
+
+    final remaining = interCooldownRemainingSec;
+    final delaySec = (remaining - 5).clamp(0, 3600);
+    if (delaySec == 0) {
+      preloadInterstitial();
+      return;
+    }
+
+    _log('Scheduled Interstitial preload in ${delaySec}s (5s before cooldown ends).');
+    _interReplenishTimer = Timer(Duration(seconds: delaySec), () {
+      _interReplenishTimer = null;
+      if (!_wasInBackground && _hasEnteredHome && rc.adsGlobalEnabled.value) {
+        preloadInterstitial();
+      }
+    });
+  }
 
   void preloadInterstitial() {
     if (!isSupportedPlatform || !rc.adsGlobalEnabled.value) return;
@@ -437,7 +584,9 @@ class AdService with WidgetsBindingObserver {
       return;
     }
 
+    _cancelInterReplenishTimer();
     _isLoadingInterstitial = true;
+    final gen = ++_interLoadGen;
     _interLoadCompleter = Completer<bool>();
     _log('Loading InterstitialAd ($adUnitId)...');
 
@@ -446,6 +595,10 @@ class AdService with WidgetsBindingObserver {
       request: const AdRequest(),
       adLoadCallback: InterstitialAdLoadCallback(
         onAdLoaded: (ad) {
+          if (gen != _interLoadGen || !rc.adsGlobalEnabled.value) {
+            ad.dispose();
+            return;
+          }
           ad.onPaidEvent = (ad, valueMicros, precision, currencyCode) {
             if (services.isRegistered<AnalyticsService>()) {
               services<AnalyticsService>().logAdRevenue(
@@ -458,6 +611,7 @@ class AdService with WidgetsBindingObserver {
             }
           };
           _interstitialAd = ad;
+          _loadedInterUnitId = adUnitId;
           _isLoadingInterstitial = false;
           interstitialCached.value = true;
           _log('InterstitialAd loaded and cached (cache=1).');
@@ -466,7 +620,9 @@ class AdService with WidgetsBindingObserver {
           }
         },
         onAdFailedToLoad: (error) {
+          if (gen != _interLoadGen) return;
           _interstitialAd = null;
+          _loadedInterUnitId = null;
           _isLoadingInterstitial = false;
           interstitialCached.value = false;
           _log('InterstitialAd failed to load: ${error.message}');
@@ -478,7 +634,6 @@ class AdService with WidgetsBindingObserver {
     );
   }
 
-  /// Mirrors `xe/f.java` (`showInterstitial(trigger, configOn)`):
   /// Checks `!unShowAd && configOn && cooldown`, shows immediately if cached,
   /// and always executes [onContinue] without blocking the user if not ready.
   Future<bool> showInterstitial({
@@ -519,13 +674,13 @@ class AdService with WidgetsBindingObserver {
 
     final dismissCompleter = Completer<bool>();
     _interstitialAd = null;
+    _loadedInterUnitId = null;
     interstitialCached.value = false;
     isShowingFullScreenAd.value = true;
 
     ad.fullScreenContentCallback = FullScreenContentCallback(
       onAdShowedFullScreenContent: (_) {
-        _log('Interstitial [$trigger] shown. Replenishing cache...');
-        preloadInterstitial();
+        _log('Interstitial [$trigger] shown.');
       },
       onAdClicked: (ad) {
         if (services.isRegistered<AnalyticsService>()) {
@@ -540,6 +695,7 @@ class AdService with WidgetsBindingObserver {
         isShowingFullScreenAd.value = false;
         _lastInterDismissTime = DateTime.now();
         _log('Interstitial [$trigger] dismissed.');
+        _scheduleInterstitialReplenish();
         onContinue?.call();
         if (!dismissCompleter.isCompleted) dismissCompleter.complete(true);
       },
@@ -547,7 +703,7 @@ class AdService with WidgetsBindingObserver {
         ad.dispose();
         isShowingFullScreenAd.value = false;
         _log('Interstitial [$trigger] failed to show: ${error.message}');
-        preloadInterstitial();
+        _scheduleInterstitialReplenish();
         onContinue?.call();
         if (!dismissCompleter.isCompleted) dismissCompleter.complete(false);
       },
@@ -564,28 +720,32 @@ class AdService with WidgetsBindingObserver {
   }
 
   // ===========================================================================
-  // 3. NATIVE AD QUEUE CACHE (`nativeCache = 3`, styles 1..6)
+  // 4. NATIVE AD JIT CACHE (MAX_CACHE = 1, Just-In-Time Preload Only)
   // ===========================================================================
 
-  Future<void> _preloadAndroidNativeQueue() async {
+  /// Preloads exactly 1 Native Ad for LanguagePage (called only for first-time
+  /// users during Splash when `onboardingDone == false`).
+  Future<void> preloadLanguageNativeAd() async {
     if (!isSupportedPlatform || !rc.adsGlobalEnabled.value) return;
-    try {
-      final count = await _platformChannel.invokeMethod<int>(
-        'preloadNativeAds',
-        <String, Object?>{
-          'adUnitId': rc.activeNativeAdUnitId,
-          'fallbackAdUnitId': rc.activeNativeFallbackAdUnitId,
-        },
-      );
-      sharedNativeCachedCount.value = count ?? 0;
-      _log(
-        'Preloading shared 3-ad Native queue (${rc.activeNativeAdUnitId})...',
-      );
-      Future<void>.delayed(const Duration(seconds: 2), refreshNativeQueueCount);
-      Future<void>.delayed(const Duration(seconds: 4), refreshNativeQueueCount);
-    } catch (_) {}
+    final unitId = rc.activeNativeLangAdUnitId;
+    if (unitId.isEmpty || rc.nativeLangStyle.value <= 0) return;
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      try {
+        await _platformChannel.invokeMethod<int>(
+          'preloadNativeAds',
+          <String, Object?>{
+            'adUnitId': unitId,
+            'fallbackAdUnitId': '',
+          },
+        );
+        _log('JIT preloading 1 Native Language ad ($unitId).');
+      } catch (_) {}
+    } else {
+      replenishNativeQueue(rc.nativeLangStyle.value);
+    }
   }
 
+  /// Preloads exactly 1 Native Ad for Onboarding step 3 when OnboardingPage opens.
   Future<void> preloadOnboardingNativeAd() async {
     if (!isSupportedPlatform || !rc.adsGlobalEnabled.value) return;
     final unitId = rc.activeNativeOnboardingAdUnitId;
@@ -596,9 +756,10 @@ class AdService with WidgetsBindingObserver {
           'preloadNativeAds',
           <String, Object?>{
             'adUnitId': unitId,
-            'fallbackAdUnitId': rc.activeNativeFallbackAdUnitId,
+            'fallbackAdUnitId': '',
           },
         );
+        _log('JIT preloading 1 Native Onboarding ad ($unitId).');
       } catch (_) {}
     } else {
       replenishNativeQueue(rc.nativeOnboardingStyle.value);
@@ -627,8 +788,8 @@ class AdService with WidgetsBindingObserver {
     return _nativeQueues[s]?.length ?? 0;
   }
 
-  /// Pops 1 preloaded `NativeAd` from the style queue (0ms delay) and triggers
-  /// background replenishment so the queue stays at `maxNativeCachePerStyle = 3`.
+  /// Pops 1 preloaded `NativeAd` from the style queue (0ms delay) without
+  /// blindly refilling the cache in the background.
   NativeAd? popCachedNativeAd(int style) {
     if (!isSupportedPlatform || !rc.adsGlobalEnabled.value || style <= 0) {
       return null;
@@ -640,10 +801,8 @@ class AdService with WidgetsBindingObserver {
       _log(
         'Popped NativeAd (style=$s) from cache queue (remaining=${queue.length}).',
       );
-      replenishNativeQueue(s);
       return ad;
     }
-    replenishNativeQueue(s);
     return null;
   }
 
@@ -696,13 +855,14 @@ class AdService with WidgetsBindingObserver {
             maxNativeCachePerStyle,
           );
           if (loadedAd is NativeAd) {
-            queue.add(loadedAd);
-            _log(
-              'NativeAd cached for $factoryId (queue=${queue.length}/$maxNativeCachePerStyle).',
-            );
-          }
-          if (queue.length < maxNativeCachePerStyle) {
-            replenishNativeQueue(s, useVideoTestId: useVideoTestId);
+            if (queue.length < maxNativeCachePerStyle) {
+              queue.add(loadedAd);
+              _log(
+                'NativeAd cached for $factoryId (queue=${queue.length}/$maxNativeCachePerStyle).',
+              );
+            } else {
+              loadedAd.dispose();
+            }
           }
         },
         onAdFailedToLoad: (failedAd, error) {
@@ -712,9 +872,6 @@ class AdService with WidgetsBindingObserver {
             maxNativeCachePerStyle,
           );
           _log('NativeAd ($factoryId) failed to load: ${error.message}');
-          if (!useVideoTestId) {
-            replenishNativeQueue(s, useVideoTestId: true);
-          }
         },
       ),
     );
@@ -724,19 +881,16 @@ class AdService with WidgetsBindingObserver {
   void resetCooldowns() {
     _lastInterDismissTime = null;
     _lastAppOpenDismissTime = null;
+    _cancelInterReplenishTimer();
     _log('Reset Interstitial & Hot Open cooldown timers.');
   }
 
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _adUnitChangeWorker?.dispose();
-    _appOpenAd?.dispose();
-    _interstitialAd?.dispose();
-    for (final list in _nativeQueues.values) {
-      for (final ad in list) {
-        ad.dispose();
-      }
-    }
-    _nativeQueues.clear();
+    _configRevisionWorker?.dispose();
+    _cancelInterReplenishTimer();
+    _disposeAppOpenCache(bumpGen: true);
+    _disposeInterstitialCache(bumpGen: true);
+    _disposeAllNativeQueues();
   }
 }

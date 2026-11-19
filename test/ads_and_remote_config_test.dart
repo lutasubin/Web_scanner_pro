@@ -120,4 +120,26 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  test('AdService show-rate optimization defaults and lifecycle guards', () async {
+    final rc = services<RemoteConfigService>();
+    final adService = services<AdService>();
+
+    expect(rc.configRevision.value, 0);
+    expect(AdService.maxNativeCachePerStyle, 1);
+    expect(adService.hasEnteredHome, isFalse);
+
+    await adService.init();
+    expect(adService.hasPendingInterReplenishTimer, isFalse);
+
+    adService.markLeftSplash();
+    expect(adService.inSplash.value, isFalse);
+
+    adService.onEnteredHome();
+    expect(adService.hasEnteredHome, isTrue);
+
+    adService.didChangeAppLifecycleState(AppLifecycleState.paused);
+    expect(adService.hasPendingInterReplenishTimer, isFalse);
+    adService.dispose();
+  });
 }

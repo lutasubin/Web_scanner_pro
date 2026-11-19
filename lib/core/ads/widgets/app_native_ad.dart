@@ -73,18 +73,9 @@ class _AppNativeAdState extends State<AppNativeAd> {
         final rc = services<RemoteConfigService>();
         _styleWorker = everAll(
           [
+            rc.configRevision,
             rc.adsGlobalEnabled,
             if (widget.styleRx != null) widget.styleRx!,
-            rc.adUnitNativeAndroid,
-            rc.adUnitNativeLangAndroid,
-            rc.adUnitNativeCollabAndroid,
-            rc.adUnitNativeOnboardingAndroid,
-            rc.adUnitNativeFallbackAndroid,
-            rc.adUnitNativeIos,
-            rc.adUnitNativeLangIos,
-            rc.adUnitNativeCollabIos,
-            rc.adUnitNativeOnboardingIos,
-            rc.adUnitNativeFallbackIos,
           ],
           (_) {
             if (!mounted) return;
